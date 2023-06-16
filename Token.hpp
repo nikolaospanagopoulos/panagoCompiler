@@ -1,4 +1,6 @@
 #pragma once
+#include "Position.h"
+#include <iostream>
 #include <string>
 
 enum {
@@ -15,7 +17,8 @@ enum {
 };
 
 class Token {
-private:
+public:
+  enum class UnionMemberUsed { CVAL, SVAL, INUM, LNUM, LLNUM, ANY } memberUsed;
   int type;
   int flags;
 
@@ -31,6 +34,6 @@ private:
   bool whitespace;
   std::string betweenBrackets;
 
-public:
+  pos position;
   ~Token();
 };

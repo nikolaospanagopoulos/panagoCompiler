@@ -2,6 +2,11 @@
 #include "CompileProcess.hpp"
 #include "CustomException.hpp"
 #include "Lexer.hpp"
+#include "Token.hpp"
+#include <iostream>
+extern "C" {
+#include "vector.h"
+}
 #include <cstdio>
 struct CompileProcess *Compiler::compileProcessCreate(const char *filename,
                                                       const char *filenameOut,
@@ -30,7 +35,31 @@ struct CompileProcess *Compiler::compileProcessCreate(const char *filename,
   compileProcess->outFile = outFile;
   return compileProcess;
 }
-int Compiler::lex() { return LEXICAL_ANALYSIS_ALL_OK; }
+int Compiler::lex() {
+
+  // could be cleaned up maybe
+  lexProcess->currentExpressionCount = 0;
+  lexProcess->parenthesesBuffer = nullptr;
+  lexProcess->position.filename =
+      lexProcess->compileProcess->cfile.absolutePath;
+
+  // read all tokens from input file
+  Token *token = lexProcess->readNextToken();
+  while (token) {
+    Token *tmp = token;
+    vector_push(lexProcess->getTokenVector(), token);
+    delete tmp;
+    token = lexProcess->readNextToken();
+  }
+
+  Token *ptr = (Token *)vector_peek(lexProcess->getTokenVector());
+  while (ptr) {
+    std::cout << "Token " << ptr->llnum << std::endl;
+    ptr = (Token *)vector_peek(lexProcess->getTokenVector());
+  }
+
+  return LEXICAL_ANALYSIS_ALL_OK;
+}
 int Compiler::compileFile(const char *filename, const char *outFilename,
                           int flags) {
   try {
@@ -51,12 +80,7 @@ int Compiler::compileFile(const char *filename, const char *outFilename,
     }
 
   } catch (CustomException &e) {
-    if (compileProcess) {
-      delete compileProcess;
-    }
-    if (lexProcess) {
-      delete lexProcess;
-    }
+    std::cout << "we are here \n";
     throw CustomException(e.what());
   }
 
@@ -64,10 +88,11 @@ int Compiler::compileFile(const char *filename, const char *outFilename,
 }
 Compiler::Compiler() : compileProcess(nullptr), lexProcess(nullptr) {}
 Compiler::~Compiler() {
-  if (compileProcess) {
-    delete compileProcess;
-  }
+  std::cout << "dest called \n";
   if (lexProcess) {
     delete lexProcess;
+  }
+  if (compileProcess) {
+    delete compileProcess;
   }
 }

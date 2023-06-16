@@ -1,7 +1,7 @@
 #include "Token.hpp"
-
+#include <cstring>
 Token::~Token() {
-  if (sval) {
+  if (memberUsed == UnionMemberUsed::SVAL) {
     delete[] sval;
   }
 }

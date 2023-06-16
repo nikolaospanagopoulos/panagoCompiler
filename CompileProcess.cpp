@@ -2,6 +2,7 @@
 #include "Position.h"
 #include <cstdio>
 #include <iostream>
+#include <sstream>
 
 compileProccessInputFile::compileProccessInputFile()
     : inputFilePtr(nullptr), absolutePath("") {}
