@@ -1,10 +1,12 @@
 
 #include "vector.h"
+#include "token.h"
 #include <assert.h>
 #include <memory.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static bool vector_in_bounds_for_at(struct vector *vector, int index) {
   return (index >= 0 && index < vector->rindex);
@@ -201,6 +203,14 @@ void vector_pop_last_peek(struct vector *vector) {
 void vector_push(struct vector *vector, void *elem) {
   void *ptr = vector_at(vector, vector->rindex);
   memcpy(ptr, elem, vector->esize);
+  if (vector->esize == sizeof(token)) {
+
+    struct token *tmp = (struct token *)elem;
+    if (tmp->type == STRING) {
+      struct token *tok = (struct token *)ptr;
+      tok->sval = tmp->sval;
+    }
+  }
 
   vector->rindex++;
   vector->count++;

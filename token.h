@@ -19,7 +19,8 @@ enum {
   NUMBER,
   STRING,
   COMMENT,
-  NEWLINE
+  NEWLINE,
+  DEFAULT
 };
 
 typedef struct token {
@@ -28,7 +29,7 @@ typedef struct token {
   pos position;
   union {
     char cval;
-    const char *sval;
+    char *sval;
     unsigned int inum;
     unsigned long lnum;
     unsigned long long llnum;
@@ -37,3 +38,5 @@ typedef struct token {
   bool whitespace;
   const char *betweenBrackets;
 } token;
+
+static token *handleWhitespace();

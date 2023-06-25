@@ -1,6 +1,7 @@
 #include "compiler.h"
 #include "compileProcess.h"
 #include "stdlib.h"
+#include "vector.h"
 #include <stdarg.h>
 #include <stdio.h>
 
@@ -36,6 +37,7 @@ int compileFile(const char *filename, const char *outFileName, int flags) {
 
   lexProcess *lexProcess =
       lexProcessCreate(process, &compilerLexFunctions, NULL);
+
   if (!lexProcess) {
     freeCompileProcess(process);
     free(process);
@@ -50,6 +52,21 @@ int compileFile(const char *filename, const char *outFileName, int flags) {
     freeLexProcess(lexProcess);
     return LEX_ERROR;
   }
+
+  vector_set_peek_pointer(lexProcess->tokenVec, 0);
+  struct token *tok = vector_peek(lexProcess->tokenVec);
+
+  while (tok) {
+    if (tok->type == NUMBER) {
+      printf("%llu", tok->llnum);
+    }
+
+    if (tok->type == STRING) {
+      printf("%s", tok->sval);
+    }
+    tok = vector_peek(lexProcess->tokenVec);
+  }
+
   freeCompileProcess(process);
   free(process);
 
