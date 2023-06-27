@@ -206,7 +206,9 @@ void vector_push(struct vector *vector, void *elem) {
   if (vector->esize == sizeof(token)) {
 
     struct token *tmp = (struct token *)elem;
-    if (tmp->type == STRING) {
+    if (tmp->type == STRING || tmp->type == OPERATOR ||
+        tmp->type == IDENTIFIER || tmp->type == KEYWORD ||
+        tmp->type == COMMENT) {
       struct token *tok = (struct token *)ptr;
       tok->sval = tmp->sval;
     }

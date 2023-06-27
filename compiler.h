@@ -2,6 +2,17 @@
 
 #include "compileProcess.h"
 
+#define S_EQ(str, str2) (str && str2 && (strcmp(str, str2) == 0))
+#define SYMBOL_CASE                                                            \
+  case '{':                                                                    \
+  case '}':                                                                    \
+  case ':':                                                                    \
+  case ';':                                                                    \
+  case '#':                                                                    \
+  case '\\':                                                                   \
+  case ')':                                                                    \
+  case ']'
+
 #define NUMERIC_CASE                                                           \
   case '0':                                                                    \
   case '1':                                                                    \
@@ -13,7 +24,24 @@
   case '7':                                                                    \
   case '8':                                                                    \
   case '9'
-
+#define OPERATOR_CASE_EXCLUDING_DIVISION                                       \
+  case '+':                                                                    \
+  case '-':                                                                    \
+  case '*':                                                                    \
+  case '>':                                                                    \
+  case '<':                                                                    \
+  case '^':                                                                    \
+  case '%':                                                                    \
+  case '!':                                                                    \
+  case '=':                                                                    \
+  case '~':                                                                    \
+  case '|':                                                                    \
+  case '&':                                                                    \
+  case '(':                                                                    \
+  case '[':                                                                    \
+  case ',':                                                                    \
+  case '.':                                                                    \
+  case '?'
 struct lexProcess;
 typedef char (*LEX_PROCESS_NEXT_CHAR)(struct lexProcess *process);
 typedef char (*LEX_PROCESS_PEEK_CHAR)(struct lexProcess *process);
@@ -52,3 +80,4 @@ struct vector *lexProcessTokens(lexProcess *process);
 int lex(lexProcess *process);
 void compilerError(compileProcess *compiler, const char *msg, ...);
 void compilerWarning(compileProcess *compiler, const char *msg, ...);
+bool tokenIsKeyword(token *token, const char *value);

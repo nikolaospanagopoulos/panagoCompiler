@@ -1,3 +1,4 @@
+#include "buffer.h"
 #include "compileProcess.h"
 #include "compiler.h"
 #include "token.h"
@@ -16,6 +17,7 @@ lexProcess *lexProcessCreate(compileProcess *compiler,
   process->privateData = privateData;
   process->pos.line = 1;
   process->pos.col = 1;
+  process->parenthesesBuffer = NULL;
   return process;
 }
 void freeLexProcess(lexProcess *process) {
@@ -23,10 +25,15 @@ void freeLexProcess(lexProcess *process) {
   struct token *tok = vector_peek(process->tokenVec);
 
   while (tok) {
-    if (tok->type == STRING) {
+    if (tok->type == STRING || tok->type == OPERATOR ||
+        tok->type == IDENTIFIER || tok->type == KEYWORD ||
+        tok->type == COMMENT) {
       free((char *)tok->sval);
     }
     tok = vector_peek(process->tokenVec);
+  }
+  if (process->parenthesesBuffer != NULL) {
+    buffer_free(process->parenthesesBuffer);
   }
   vector_free(process->tokenVec);
   free(process);

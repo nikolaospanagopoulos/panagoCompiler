@@ -1,6 +1,7 @@
 #include "compiler.h"
 #include "compileProcess.h"
 #include "stdlib.h"
+#include "token.h"
 #include "vector.h"
 #include <stdarg.h>
 #include <stdio.h>
@@ -58,11 +59,29 @@ int compileFile(const char *filename, const char *outFileName, int flags) {
 
   while (tok) {
     if (tok->type == NUMBER) {
-      printf("%llu", tok->llnum);
+      printf("NUMBER TOKEN: %llu \n", tok->llnum);
     }
 
     if (tok->type == STRING) {
-      printf("%s", tok->sval);
+      printf("STRING TOKEN: %s\n", tok->sval);
+    }
+    if (tok->type == OPERATOR) {
+      printf("OPERATOR TOKEN: %s\n", tok->sval);
+    }
+    if (tok->type == SYMBOL) {
+      printf("SYMBOL TOKEN: %c\n", tok->cval);
+    }
+    if (tok->type == IDENTIFIER) {
+      printf("IDENTIFIER TOKEN: %s\n", tok->sval);
+    }
+    if (tok->type == KEYWORD) {
+      printf("KEYWORD TOKEN: %s\n", tok->sval);
+    }
+    if (tok->type == NEWLINE) {
+      printf("NEW LINE \n");
+    }
+    if (tok->type == COMMENT) {
+      printf("COMMENT TOKEN: %s\n", tok->sval);
     }
     tok = vector_peek(lexProcess->tokenVec);
   }
