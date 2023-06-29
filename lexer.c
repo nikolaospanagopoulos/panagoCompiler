@@ -4,6 +4,7 @@
 #include "vector.h"
 #include <ctype.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,8 +16,12 @@
 static int errorNum = 0;
 static struct lexProcess *lex_Process;
 static token tmpToken;
+bool lexInExpression() { return lex_Process->currentExpressionCount > 0; }
 static char nextc() {
   char c = lex_Process->function->nextChar(lex_Process);
+  if (lexInExpression()) {
+    buffer_write(lex_Process->parenthesesBuffer, c);
+  }
   lex_Process->pos.col += 1;
   if (c != '\n') {
     lex_Process->pos.line += 1;
@@ -43,11 +48,28 @@ unsigned long long readNumber() {
 token *tokenCreate(token *_token) {
   memcpy(&tmpToken, _token, sizeof(token));
   tmpToken.position = lexFilePosition();
+  if (lexInExpression()) {
+    tmpToken.betweenBrackets = buffer_ptr(lex_Process->parenthesesBuffer);
+  }
   tmpToken.type = _token->type;
   return &tmpToken;
 }
+int lexerNumType(char c) {
+  int res = NORMAL;
+  if (c == 'L') {
+    res = LONG;
+  } else if (c == 'f') {
+    res = FLOAT;
+  }
+  return res;
+}
 token *tokenMakeNumberForValue(unsigned long number) {
-  return tokenCreate(&(struct token){.type = NUMBER, .llnum = number});
+  int numberType = lexerNumType(peekc());
+  if (numberType != NORMAL) {
+    nextc();
+  }
+  return tokenCreate(
+      &(struct token){.type = NUMBER, .llnum = number, .num.type = numberType});
 }
 
 token *tokenMakeNumber() { return tokenMakeNumberForValue(readNumber()); }
@@ -139,10 +161,10 @@ static void lexNewExpression() {
     lex_Process->parenthesesBuffer = buffer_create();
   }
 }
-bool lexInExpression() { return lex_Process->currentExpressionCount > 0; }
 
 static void lexFinishExpression() {
   lex_Process->currentExpressionCount--;
+  buffer_free(lex_Process->parenthesesBuffer);
   if (lex_Process->currentExpressionCount < 0) {
     compilerError(lex_Process->compiler,
                   "You closed an expresssion which you never opened\n");
@@ -186,6 +208,29 @@ token *tokenMakeOperatorOrString() {
   buffer_free(buffer);
 
   return token;
+}
+bool isValid(const char *str) {
+  size_t len = strlen(str);
+  for (int i = 0; i < len; i++) {
+    if (str[i] != '1' && str[i] != '0') {
+      return false;
+    }
+  }
+  return true;
+}
+token *makeBinary() {
+  nextc(); // skip b
+  unsigned long number = 0;
+  struct buffer *buffer = readNumberStr();
+  if (isValid(buffer_ptr(buffer))) {
+    number = strtol(buffer_ptr(buffer), 0, 2);
+    buffer_free(buffer);
+    return tokenMakeNumberForValue(number);
+  }
+  buffer_free(buffer);
+  compilerError(lex_Process->compiler, "Not a valid binary number. \n");
+  errorNum = 1;
+  return NULL;
 }
 static struct token *tokenMakeSymbol() {
   char c = nextc();
@@ -345,10 +390,15 @@ token *makeSpecialNum() {
   token *token = NULL;
   struct token *lastToken = lexerLastToken();
   // remove 0 . ex 0x555
+  if (!lastToken || !(lastToken->type == NUMBER && lastToken->llnum == 0)) {
+    return tokenMakeIdentifierOrKeyword();
+  }
   lexerPopToken();
   char c = peekc();
   if (c == 'x') {
     token = tokenMakeHex();
+  } else if (c == 'b') {
+    token = makeBinary();
   }
   return token;
 }
@@ -387,6 +437,7 @@ token *readNextToken() {
   SYMBOL_CASE:
     token = tokenMakeSymbol();
     break;
+  case 'b':
   case 'x':
     token = makeSpecialNum();
     break;

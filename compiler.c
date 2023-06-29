@@ -54,6 +54,9 @@ int compileFile(const char *filename, const char *outFileName, int flags) {
     return LEX_ERROR;
   }
 
+  // maybe check when to clean vector
+  process->tokenVec = lexProcess->tokenVec;
+
   vector_set_peek_pointer(lexProcess->tokenVec, 0);
   struct token *tok = vector_peek(lexProcess->tokenVec);
 

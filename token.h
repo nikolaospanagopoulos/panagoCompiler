@@ -22,7 +22,7 @@ enum {
   NEWLINE,
   DEFAULT
 };
-
+enum { NORMAL, LONG, FLOAT, DOUBLE };
 typedef struct token {
   int type;
   int flags;
@@ -35,6 +35,9 @@ typedef struct token {
     unsigned long long llnum;
     void *any;
   };
+  struct tokenNumber {
+    int type;
+  } num;
   bool whitespace;
   const char *betweenBrackets;
 } token;

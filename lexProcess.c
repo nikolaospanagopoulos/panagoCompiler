@@ -32,9 +32,6 @@ void freeLexProcess(lexProcess *process) {
     }
     tok = vector_peek(process->tokenVec);
   }
-  if (process->parenthesesBuffer != NULL) {
-    buffer_free(process->parenthesesBuffer);
-  }
   vector_free(process->tokenVec);
   free(process);
 }

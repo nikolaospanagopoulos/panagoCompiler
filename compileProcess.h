@@ -12,6 +12,7 @@ typedef struct compileProcess {
     const char *absolutePath;
   } cfile;
   FILE *outFile;
+  struct vector *tokenVec;
 } compileProcess;
 
 void freeCompileProcess(compileProcess *cp);
