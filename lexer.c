@@ -3,6 +3,7 @@
 #include "token.h"
 #include "vector.h"
 #include <ctype.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -313,6 +314,44 @@ static char assertNextChar(char c) {
   }
   return c;
 }
+void lexerPopToken() { vector_pop(lex_Process->tokenVec); }
+
+bool isHexChar(char c) {
+  c = tolower(c);
+  return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+}
+
+struct buffer *readHexNumberStr() {
+  struct buffer *buffer = buffer_create();
+  char c = peekc();
+  LEX_GETC_IF(buffer, c, isHexChar(c));
+
+  buffer_write(buffer, 0x00);
+
+  return buffer;
+}
+
+token *tokenMakeHex() {
+  // skip x
+  nextc();
+  unsigned long number = 0;
+  struct buffer *numberStr = readHexNumberStr();
+  number = strtol(buffer_ptr(numberStr), 0, 16);
+  buffer_free(numberStr);
+  return tokenMakeNumberForValue(number);
+}
+
+token *makeSpecialNum() {
+  token *token = NULL;
+  struct token *lastToken = lexerLastToken();
+  // remove 0 . ex 0x555
+  lexerPopToken();
+  char c = peekc();
+  if (c == 'x') {
+    token = tokenMakeHex();
+  }
+  return token;
+}
 token *tokenMakeQuote() {
 
   assertNextChar('\'');
@@ -347,6 +386,9 @@ token *readNextToken() {
     break;
   SYMBOL_CASE:
     token = tokenMakeSymbol();
+    break;
+  case 'x':
+    token = makeSpecialNum();
     break;
   case '"':
     token = tokenMakeString('"', '"');
