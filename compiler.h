@@ -1,6 +1,7 @@
 #pragma once
 
 #include "compileProcess.h"
+#include "node.h"
 
 #define S_EQ(str, str2) (str && str2 && (strcmp(str, str2) == 0))
 #define SYMBOL_CASE                                                            \
@@ -83,3 +84,11 @@ void compilerError(compileProcess *compiler, const char *msg, ...);
 void compilerWarning(compileProcess *compiler, const char *msg, ...);
 bool tokenIsKeyword(token *token, const char *value);
 int parse(compileProcess *process);
+node *nodeCreate(node *_node);
+node *nodePop();
+node *nodePeek();
+void nodeSetVector(struct vector *vec, struct vector *rootVec);
+
+void nodePush(node *node);
+
+node *nodePeekOrNull();

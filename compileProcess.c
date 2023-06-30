@@ -35,6 +35,7 @@ void freeCompileProcess(compileProcess *cp) {
   if (cp->outFile) {
     fclose(cp->outFile);
   }
+
   vector_free(cp->nodeTreeVec);
   vector_free(cp->nodeVec);
 }

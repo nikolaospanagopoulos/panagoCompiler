@@ -1,5 +1,6 @@
 #include "compiler.h"
 #include "compileProcess.h"
+#include "node.h"
 #include "stdlib.h"
 #include "token.h"
 #include "vector.h"
@@ -57,6 +58,16 @@ int compileFile(const char *filename, const char *outFileName, int flags) {
   // maybe check when to clean vector
   process->tokenVec = lexProcess->tokenVec;
   if (parse(process) != PARSE_ALL_OK) {
+
+    vector_set_peek_pointer(process->nodeTreeVec, 0);
+    struct node **node = (struct node **)vector_peek(process->nodeTreeVec);
+
+    while (node) {
+
+      free(*node);
+      node = (struct node **)vector_peek(process->nodeTreeVec);
+    }
+
     freeCompileProcess(process);
     free(process);
 
@@ -64,36 +75,23 @@ int compileFile(const char *filename, const char *outFileName, int flags) {
     return PARSE_ERROR;
   }
 
-  vector_set_peek_pointer(lexProcess->tokenVec, 0);
-  struct token *tok = vector_peek(lexProcess->tokenVec);
+  vector_set_peek_pointer(process->nodeTreeVec, 0);
+  struct node **node = (struct node **)vector_peek(process->nodeTreeVec);
 
-  while (tok) {
-    if (tok->type == NUMBER) {
-      printf("NUMBER TOKEN: %llu \n", tok->llnum);
+  while (node) {
+
+    if ((**node).type == NODE_TYPE_STRING) {
+      printf("STRING NODE: %s\n", (**node).sval);
+    }
+    if ((**node).type == NODE_TYPE_IDENTIFIER) {
+      printf("IDENTIFIER NODE: %s\n", (**node).sval);
+    }
+    if ((**node).type == NODE_TYPE_NUMBER) {
+      printf("NUMBER NODE: %llu\n", (**node).llnum);
     }
 
-    if (tok->type == STRING) {
-      printf("STRING TOKEN: %s\n", tok->sval);
-    }
-    if (tok->type == OPERATOR) {
-      printf("OPERATOR TOKEN: %s\n", tok->sval);
-    }
-    if (tok->type == SYMBOL) {
-      printf("SYMBOL TOKEN: %c\n", tok->cval);
-    }
-    if (tok->type == IDENTIFIER) {
-      printf("IDENTIFIER TOKEN: %s\n", tok->sval);
-    }
-    if (tok->type == KEYWORD) {
-      printf("KEYWORD TOKEN: %s\n", tok->sval);
-    }
-    if (tok->type == NEWLINE) {
-      printf("NEW LINE \n");
-    }
-    if (tok->type == COMMENT) {
-      printf("COMMENT TOKEN: %s\n", tok->sval);
-    }
-    tok = vector_peek(lexProcess->tokenVec);
+    free(*node);
+    node = (struct node **)vector_peek(process->nodeTreeVec);
   }
 
   freeCompileProcess(process);
