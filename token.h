@@ -1,15 +1,7 @@
 #pragma once
-
+#include "position.h"
 #include <stdbool.h>
 #include <stdio.h>
-
-typedef struct pos {
-
-  int line;
-  int col;
-  const char *filename;
-
-} pos;
 
 enum {
   IDENTIFIER,

@@ -66,6 +66,7 @@ typedef struct lexProcess {
 
 } lexProcess;
 
+enum { PARSE_ALL_OK, PARSE_ERROR };
 char compileProcessNextChar(lexProcess *process);
 char compileProcessPeekChar(lexProcess *process);
 void compileProcessPushChar(lexProcess *process, char c);
@@ -81,3 +82,4 @@ int lex(lexProcess *process);
 void compilerError(compileProcess *compiler, const char *msg, ...);
 void compilerWarning(compileProcess *compiler, const char *msg, ...);
 bool tokenIsKeyword(token *token, const char *value);
+int parse(compileProcess *process);

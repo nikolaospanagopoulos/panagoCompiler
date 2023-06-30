@@ -1,5 +1,7 @@
 #include "compileProcess.h"
 #include "compiler.h"
+#include "node.h"
+#include "vector.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -33,6 +35,8 @@ void freeCompileProcess(compileProcess *cp) {
   if (cp->outFile) {
     fclose(cp->outFile);
   }
+  vector_free(cp->nodeTreeVec);
+  vector_free(cp->nodeVec);
 }
 
 compileProcess *compileProcessCreate(const char *filename,
@@ -53,6 +57,8 @@ compileProcess *compileProcessCreate(const char *filename,
   process->flags = flags;
   process->cfile.fp = file;
   process->outFile = outFile;
+  process->nodeVec = vector_create(sizeof(struct node *));
+  process->nodeTreeVec = vector_create(sizeof(struct node *));
 
   return process;
 }

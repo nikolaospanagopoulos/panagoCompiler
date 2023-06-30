@@ -13,6 +13,8 @@ typedef struct compileProcess {
   } cfile;
   FILE *outFile;
   struct vector *tokenVec;
+  struct vector *nodeVec;
+  struct vector *nodeTreeVec;
 } compileProcess;
 
 void freeCompileProcess(compileProcess *cp);

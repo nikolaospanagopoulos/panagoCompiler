@@ -56,6 +56,13 @@ int compileFile(const char *filename, const char *outFileName, int flags) {
 
   // maybe check when to clean vector
   process->tokenVec = lexProcess->tokenVec;
+  if (parse(process) != PARSE_ALL_OK) {
+    freeCompileProcess(process);
+    free(process);
+
+    freeLexProcess(lexProcess);
+    return PARSE_ERROR;
+  }
 
   vector_set_peek_pointer(lexProcess->tokenVec, 0);
   struct token *tok = vector_peek(lexProcess->tokenVec);

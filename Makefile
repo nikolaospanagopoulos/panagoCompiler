@@ -1,4 +1,4 @@
-OBJECTS= ./build/vector.o ./build/compiler.o ./build/compileProcess.o ./build/buffer.o ./build/lexProcess.o ./build/lexer.o ./build/token.o
+OBJECTS= ./build/vector.o ./build/compiler.o ./build/compileProcess.o ./build/buffer.o ./build/lexProcess.o ./build/lexer.o ./build/token.o ./build/parser.o
 
 all: ${OBJECTS}
 	gcc main.c ${OBJECTS}  -g -o ./bin/main
@@ -16,6 +16,8 @@ all: ${OBJECTS}
 	gcc ./lexer.c  -o ./build/lexer.o -g -c
 ./build/token.o: ./token.c
 	gcc ./token.c -o ./build/token.o -g -c
+./build/parser.o: ./parcer.c
+	gcc ./parcer.c -o ./build/parser.o -g -c
 clean:
 	rm ./bin/main
 	rm -rf ${OBJECTS}
