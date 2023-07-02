@@ -6,9 +6,27 @@
 #include "vector.h"
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 int errorHappened = 0;
 static struct compileProcess *currentProcess;
 static token *parserLastToken;
+
+typedef struct history {
+  int flags;
+} history;
+
+history *historyBegin(int flags) {
+  history *history = calloc(1, sizeof(struct history));
+  history->flags = flags;
+  return history;
+}
+history *historyDown(history *hs, int flags) {
+  history *newHistory = calloc(1, sizeof(history));
+  memcpy(newHistory, hs, sizeof(history));
+  newHistory->flags = flags;
+  return newHistory;
+}
 
 bool tokenIsSymbol(token *token, char c) {
   return token->type == SYMBOL && token->cval == c;
@@ -61,12 +79,69 @@ void parseSingleTokenToNode() {
     errorHappened = 1;
   }
 }
+void parseExpressionable(history *hs);
+void parseExpressionableForOp(history *hs, const char *op);
 
+int parseExpressionNormal(history *hs) {
+  token *opToken = tokenPeekNext();
+  char *op = opToken->sval;
+  node *nodeLeft = nodePeekExpressionableOrNull();
+  if (!nodeLeft) {
+    printf("no node lef \n");
+    return -1;
+  }
+  tokenNext();
+  nodePop();
+  nodeLeft->flags |= INSIDE_EXPRESSION;
+  parseExpressionableForOp(historyDown(hs, hs->flags), op);
+  node *rightNode = nodePop();
+  if (!rightNode) {
+    return -1;
+  }
+  rightNode->flags |= INSIDE_EXPRESSION;
+  makeExpNode(nodeLeft, rightNode, op);
+  node *expNode = nodePop();
+  nodePush(expNode);
+  return 0;
+}
+void parseExpressionableForOp(history *hs, const char *op) {
+  parseExpressionable(hs);
+}
+int parseExp(history *hs) {
+  int res = parseExpressionNormal(hs);
+  return res;
+}
+
+int parseExpressionableSingle(history *hs) {
+  token *token = tokenPeekNext();
+  if (!token) {
+    return -1;
+  }
+  hs->flags |= INSIDE_EXPRESSION;
+  int res = -1;
+  switch (token->type) {
+  case NUMBER:
+    parseSingleTokenToNode();
+    res = 0;
+    break;
+  case OPERATOR:
+
+    res = parseExp(hs);
+    break;
+  }
+  return res;
+}
+void parseExpressionable(history *hs) {
+  while (parseExpressionableSingle(hs) == 0) {
+  }
+  free(hs);
+}
 int parseNext() {
 
   token *token = tokenPeekNext();
   if (!token) {
     // check memory cleanup
+    printf("end\n");
     return -1;
   }
 
@@ -76,11 +151,10 @@ int parseNext() {
   case NUMBER:
   case IDENTIFIER:
   case STRING:
-    parseSingleTokenToNode();
+    parseExpressionable(historyBegin(0));
     break;
   }
-
-  return 0;
+  return res;
 }
 
 int parse(compileProcess *process) {

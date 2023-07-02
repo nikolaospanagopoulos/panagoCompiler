@@ -68,36 +68,16 @@ int compileFile(const char *filename, const char *outFileName, int flags) {
       node = (struct node **)vector_peek(process->nodeTreeVec);
     }
 
+    freeLexProcess(lexProcess);
     freeCompileProcess(process);
     free(process);
 
-    freeLexProcess(lexProcess);
     return PARSE_ERROR;
   }
 
-  vector_set_peek_pointer(process->nodeTreeVec, 0);
-  struct node **node = (struct node **)vector_peek(process->nodeTreeVec);
-
-  while (node) {
-
-    if ((**node).type == NODE_TYPE_STRING) {
-      printf("STRING NODE: %s\n", (**node).sval);
-    }
-    if ((**node).type == NODE_TYPE_IDENTIFIER) {
-      printf("IDENTIFIER NODE: %s\n", (**node).sval);
-    }
-    if ((**node).type == NODE_TYPE_NUMBER) {
-      printf("NUMBER NODE: %llu\n", (**node).llnum);
-    }
-
-    free(*node);
-    node = (struct node **)vector_peek(process->nodeTreeVec);
-  }
-
+  freeLexProcess(lexProcess);
   freeCompileProcess(process);
   free(process);
-
-  freeLexProcess(lexProcess);
 
   return COMPILER_FILE_COMPILED_OK;
 }

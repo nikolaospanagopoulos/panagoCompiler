@@ -56,6 +56,8 @@ struct lexProcessFunctions {
 
 enum { LEX_ALL_OK, LEX_ERROR };
 
+enum { INSIDE_EXPRESSION = 0b00000001 };
+
 typedef struct lexProcess {
   pos pos;
   struct vector *tokenVec;
@@ -92,3 +94,8 @@ void nodeSetVector(struct vector *vec, struct vector *rootVec);
 void nodePush(node *node);
 
 node *nodePeekOrNull();
+
+bool nodeIsExpressionable(node *node);
+node *nodeCreate(node *_node);
+node *nodePeekExpressionableOrNull();
+void makeExpNode(node *left, node *right, const char *op);
