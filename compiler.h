@@ -70,6 +70,20 @@ typedef struct lexProcess {
 } lexProcess;
 
 enum { PARSE_ALL_OK, PARSE_ERROR };
+
+#define TOTAL_OPERATOR_GROUPS 14
+#define MAX_OPERATORS_IN_GROUP 12
+
+enum {
+  ASSOCIATIVITY_LEFT_TO_RIGHT,
+  ASSOCIATIVITY_RIGHT_TO_LEFT,
+};
+
+struct expressionableOpPrecedenceGroup {
+  char *operators[MAX_OPERATORS_IN_GROUP];
+  int associtivity;
+};
+
 char compileProcessNextChar(lexProcess *process);
 char compileProcessPeekChar(lexProcess *process);
 void compileProcessPushChar(lexProcess *process, char c);
@@ -89,7 +103,8 @@ int parse(compileProcess *process);
 node *nodeCreate(node *_node);
 node *nodePop();
 node *nodePeek();
-void nodeSetVector(struct vector *vec, struct vector *rootVec);
+void nodeSetVector(struct vector *vec, struct vector *rootVec,
+                   struct vector *garbageVec);
 
 void nodePush(node *node);
 
@@ -98,4 +113,4 @@ node *nodePeekOrNull();
 bool nodeIsExpressionable(node *node);
 node *nodeCreate(node *_node);
 node *nodePeekExpressionableOrNull();
-void makeExpNode(node *left, node *right, const char *op);
+node *makeExpNode(node *left, node *right, const char *op);

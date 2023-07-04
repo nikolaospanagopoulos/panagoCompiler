@@ -29,17 +29,13 @@ void compileProcessPushChar(lexProcess *process, char c) {
   ungetc(c, cProcess->cfile.fp);
 }
 void freeNode(struct node *node) {
-  if (node == NULL) {
-    return; // Base case: reached the end of the tree
+  if (!node) {
+    return;
   }
 
-  freeNode(node->exp.left);  // Recursively free the left subtree
-  freeNode(node->exp.right); // Recursively free the right subtree
-
-  // Free any other dynamically allocated members of the node here
-  // ...
-
-  free(node); // Free the current node
+  if (node) {
+    free(node);
+  }
 }
 void printNode(struct node *node) {
   if (node == NULL) {
@@ -48,11 +44,10 @@ void printNode(struct node *node) {
 
   printNode(node->exp.left);
 
-  if (node->type == NODE_TYPE_STRING || node->type == NODE_TYPE_IDENTIFIER) {
-    printf("%s \n", node->sval);
-  }
-  if (node->type == NODE_TYPE_NUMBER) {
-    printf("%llu \n", node->llnum);
+  if (node) {
+    if (node->type == NODE_TYPE_NUMBER) {
+      printf("NUM: %llu \n", node->llnum);
+    }
   }
 
   printNode(node->exp.right);
@@ -74,16 +69,18 @@ void freeCompileProcess(compileProcess *cp) {
   if (cp->outFile) {
     fclose(cp->outFile);
   }
-  printNodeTreeVector(cp);
 
-  vector_set_peek_pointer(cp->nodeTreeVec, 0);
-  struct node **node = (struct node **)vector_peek(cp->nodeTreeVec);
-  while (node) {
-    freeNode((*node));
-    node = (struct node **)vector_peek(cp->nodeTreeVec);
+  printNodeTreeVector(cp);
+  vector_set_peek_pointer(cp->garbageVec, 0);
+  struct node **nodeg = (struct node **)vector_peek(cp->garbageVec);
+  while (nodeg) {
+    freeNode(*nodeg);
+    nodeg = (struct node **)vector_peek(cp->garbageVec);
   }
-  vector_free(cp->nodeVec);
+
   vector_free(cp->nodeTreeVec);
+  vector_free(cp->nodeVec);
+  vector_free(cp->garbageVec);
 }
 
 compileProcess *compileProcessCreate(const char *filename,
@@ -106,6 +103,7 @@ compileProcess *compileProcessCreate(const char *filename,
   process->outFile = outFile;
   process->nodeVec = vector_create(sizeof(struct node *));
   process->nodeTreeVec = vector_create(sizeof(struct node *));
+  process->garbageVec = vector_create(sizeof(struct node *));
 
   return process;
 }

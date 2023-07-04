@@ -74,7 +74,7 @@ int compileFile(const char *filename, const char *outFileName, int flags) {
 
     return PARSE_ERROR;
   }
-
+  printf("NIKOS\n");
   freeLexProcess(lexProcess);
   freeCompileProcess(process);
   free(process);
