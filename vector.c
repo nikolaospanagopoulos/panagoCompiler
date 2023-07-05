@@ -1,5 +1,6 @@
-
 #include "vector.h"
+#include "compileProcess.h"
+#include "compiler.h"
 #include "node.h"
 #include "token.h"
 #include <assert.h>
@@ -8,7 +9,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+static compileProcess *process;
+static lexProcess *pr;
+void setCompileProcessLexProcess(compileProcess *cp, lexProcess *lex) {
+  process = cp;
+  pr = lex;
+}
 static bool vector_in_bounds_for_at(struct vector *vector, int index) {
   return (index >= 0 && index < vector->rindex);
 }
@@ -17,9 +23,7 @@ static bool vector_in_bounds_for_pop(struct vector *vector, int index) {
   return (index >= 0 && index < vector->mindex);
 }
 
-static void vector_assert_bounds_for_pop(struct vector *vector, int index) {
-  assert(vector_in_bounds_for_pop(vector, index));
-}
+static void vector_assert_bounds_for_pop(struct vector *vector, int index) {}
 
 struct vector *vector_create_no_saves(size_t esize) {
   struct vector *vector = calloc(sizeof(struct vector), 1);

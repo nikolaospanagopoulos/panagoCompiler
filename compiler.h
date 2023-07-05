@@ -1,5 +1,4 @@
 #pragma once
-
 #include "compileProcess.h"
 #include "node.h"
 #include <stddef.h>
@@ -162,3 +161,10 @@ enum {
 };
 bool datatypeIsStructOrUnionForName(const char *name);
 bool tokenIsOperator(token *token, const char *val);
+enum {
+  DATA_SIZE_ZERO = 0,
+  DATA_SIZE_BYTE = 1,
+  DATA_SIZE_WORD = 2,
+  DATA_SIZE_DWORD = 4,
+  DATA_SIZE_DDWORD = 8
+};

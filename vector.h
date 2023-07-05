@@ -1,6 +1,8 @@
 #ifndef VECTOR_H
 #define VECTOR_H
 
+#include "compileProcess.h"
+#include "compiler.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -11,6 +13,7 @@
 // to reallocate memory again
 #define VECTOR_ELEMENT_INCREMENT 20
 
+void setCompileProcessLexProcess(compileProcess *cp, lexProcess *lex);
 enum { VECTOR_FLAG_PEEK_DECREMENT = 0b00000001 };
 
 struct vector {

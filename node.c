@@ -26,14 +26,11 @@ node *nodePeekOrNull() { return vector_back_ptr_or_null(nodeVector); }
 node *nodePeek() { return *(struct node **)(vector_back(nodeVector)); }
 
 node *nodePop() {
-  node *lastNode = vector_back_ptr(nodeVector);
+  node *lastNode = vector_back_ptr_or_null(nodeVector);
   node *lastNodeRoot =
       vector_empty(nodeVector) ? NULL : vector_back_ptr_or_null(nodeVectorRoot);
 
   vector_pop(nodeVector);
-  if (lastNodeRoot) {
-    printf("PIDARAS \n");
-  }
 
   if (lastNode == lastNodeRoot) {
     vector_pop(nodeVectorRoot);

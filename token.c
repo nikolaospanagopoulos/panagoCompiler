@@ -8,10 +8,13 @@ const char *primitiveTypes[PRIMITIVE_TYPES_NUM] = {
     "void", "char", "short", "int", "long", "float", "double"};
 
 bool tokenIsKeyword(token *token, const char *value) {
-  return token->type == KEYWORD && S_EQ(token->sval, value);
+  return token && token->type == KEYWORD && S_EQ(token->sval, value);
 }
 
 bool tokenIsPrimitiveKeyword(token *token) {
+  if (!token) {
+    return false;
+  }
   if (token->type != KEYWORD) {
     return false;
   }
@@ -24,5 +27,5 @@ bool tokenIsPrimitiveKeyword(token *token) {
 }
 
 bool tokenIsOperator(token *token, const char *val) {
-  return token->type == OPERATOR && S_EQ(token->sval, val);
+  return token && token->type == OPERATOR && S_EQ(token->sval, val);
 }

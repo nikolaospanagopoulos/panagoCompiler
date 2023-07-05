@@ -78,9 +78,15 @@ void freeCompileProcess(compileProcess *cp) {
     nodeg = (struct node **)vector_peek(cp->garbageVec);
   }
 
+  struct datatype **dt = (struct datatype **)vector_peek(cp->garbageDatatypes);
+  while (dt) {
+    free(*dt);
+    dt = (struct datatype **)vector_peek(cp->garbageDatatypes);
+  }
   vector_free(cp->nodeTreeVec);
   vector_free(cp->nodeVec);
   vector_free(cp->garbageVec);
+  vector_free(cp->garbageDatatypes);
 }
 
 compileProcess *compileProcessCreate(const char *filename,
@@ -104,6 +110,7 @@ compileProcess *compileProcessCreate(const char *filename,
   process->nodeVec = vector_create(sizeof(struct node *));
   process->nodeTreeVec = vector_create(sizeof(struct node *));
   process->garbageVec = vector_create(sizeof(struct node *));
+  process->garbageDatatypes = vector_create(sizeof(datatype *));
 
   return process;
 }

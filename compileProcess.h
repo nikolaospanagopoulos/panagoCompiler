@@ -16,6 +16,8 @@ typedef struct compileProcess {
   struct vector *nodeVec;
   struct vector *nodeTreeVec;
   struct vector *garbageVec;
+  struct vector *garbageDatatypes;
+
 } compileProcess;
 
 void freeCompileProcess(compileProcess *cp);

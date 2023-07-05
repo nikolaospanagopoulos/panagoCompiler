@@ -57,6 +57,7 @@ int compileFile(const char *filename, const char *outFileName, int flags) {
 
   // maybe check when to clean vector
   process->tokenVec = lexProcess->tokenVec;
+  setCompileProcessLexProcess(process, lexProcess);
   if (parse(process) != PARSE_ALL_OK) {
 
     vector_set_peek_pointer(process->nodeTreeVec, 0);
@@ -71,10 +72,8 @@ int compileFile(const char *filename, const char *outFileName, int flags) {
     freeLexProcess(lexProcess);
     freeCompileProcess(process);
     free(process);
-
     return PARSE_ERROR;
   }
-  printf("NIKOS\n");
   freeLexProcess(lexProcess);
   freeCompileProcess(process);
   free(process);

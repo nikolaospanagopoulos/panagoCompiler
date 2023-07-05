@@ -32,10 +32,13 @@ history *historyDown(history *hs, int flags) {
 }
 
 bool tokenIsSymbol(token *token, char c) {
-  return token->type == SYMBOL && token->cval == c;
+  return token && token->type == SYMBOL && token->cval == c;
 }
 
 static bool tokenIsNewLineOrComment(token *token) {
+  if (!token) {
+    return false;
+  }
   return token->type == NEWLINE || token->type == COMMENT ||
          tokenIsSymbol(token, '\\');
 }
@@ -270,11 +273,105 @@ int getPtrDepth() {
   }
   return depth;
 }
+bool secondaryTypeAllowed(int expectedType) {
+  return expectedType == DATA_TYPE_EXPECT_PRIMITIVE;
+}
+bool datatypeIsSecondaryAllowedForType(const char *type) {
+  return S_EQ(type, "long") || S_EQ(type, "short") || S_EQ(type, "double") ||
+         S_EQ(type, "float");
+}
+
+void parserDatatypeInitSizeAndTypeForPrimitive(struct token *datatypeToken,
+                                               struct token *datatypeSecToken,
+                                               datatype *datatypeOut);
+void parserDatatypeAdjustSizeForSecondary(datatype *datatype,
+                                          token *datatypeSecToken) {
+  if (!datatypeSecToken) {
+    return;
+  }
+  struct datatype *secondaryDataType = calloc(1, sizeof(struct datatype));
+
+  parserDatatypeInitSizeAndTypeForPrimitive(datatypeSecToken, NULL,
+
+                                            secondaryDataType);
+  vector_push(currentProcess->garbageDatatypes, &secondaryDataType);
+  datatype->size += secondaryDataType->size;
+  datatype->secondary = secondaryDataType;
+  datatype->flags |= DATATYPE_FLAG_IS_SECONDARY;
+}
+void parserDatatypeInitSizeAndTypeForPrimitive(struct token *datatypeToken,
+                                               struct token *datatypeSecToken,
+                                               datatype *datatypeOut) {
+  if (!datatypeIsSecondaryAllowedForType(datatypeToken->sval) &&
+      datatypeSecToken) {
+    compilerError(
+        currentProcess,
+        "You cannot use a secondary datatype for the given datatype %s \n",
+        datatypeToken->sval);
+    errorHappened = 1;
+  }
+  if (S_EQ(datatypeToken->sval, "void")) {
+    datatypeOut->type = DATA_TYPE_VOID;
+    datatypeOut->size = DATA_SIZE_ZERO;
+  } else if (S_EQ(datatypeToken->sval, "char")) {
+    datatypeOut->type = DATA_TYPE_CHAR;
+    datatypeOut->size = DATA_SIZE_BYTE;
+  } else if (S_EQ(datatypeToken->sval, "short")) {
+    datatypeOut->type = DATA_TYPE_SHORT;
+    datatypeOut->size = DATA_SIZE_WORD;
+  } else if (S_EQ(datatypeToken->sval, "int")) {
+    datatypeOut->type = DATA_TYPE_INTEGER;
+    datatypeOut->size = DATA_SIZE_DWORD;
+  } else if (S_EQ(datatypeToken->sval, "long")) {
+    datatypeOut->type = DATA_TYPE_LONG;
+    datatypeOut->size = DATA_SIZE_DWORD;
+  } else if (S_EQ(datatypeToken->sval, "float")) {
+    datatypeOut->type = DATA_TYPE_FLOAT;
+    datatypeOut->size = DATA_SIZE_DWORD;
+  } else if (S_EQ(datatypeToken->sval, "double")) {
+    datatypeOut->type = DATA_TYPE_DOUBLE;
+    datatypeOut->size = DATA_SIZE_DWORD;
+  } else {
+    compilerError(currentProcess, "Invalid primitive data type \n");
+    errorHappened = 1;
+  }
+  parserDatatypeAdjustSizeForSecondary(datatypeOut, datatypeSecToken);
+}
 void parserInitDatatypeTypeAndSize(token *datatypeToken,
                                    token *datatypeSecToken, datatype *typeOut,
-                                   int ptrDepth, int expectedType) {}
+                                   int ptrDepth, int expectedType) {
+
+  if (!secondaryTypeAllowed(expectedType) && datatypeSecToken) {
+    compilerError(currentProcess, "You provided an invalid secondary type \n");
+    errorHappened = 1;
+  }
+  switch (expectedType) {
+  case DATA_TYPE_EXPECT_PRIMITIVE:
+    parserDatatypeInitSizeAndTypeForPrimitive(datatypeToken, datatypeSecToken,
+                                              typeOut);
+    break;
+  case DATA_TYPE_EXPECT_STRUCT:
+  case DATA_TYPE_EXPECT_UNION:
+    compilerError(currentProcess, "Cannot use struct or unions yet \n");
+    errorHappened = 1;
+    break;
+  default:
+    compilerError(currentProcess, "Unsupported datatype expectation \n");
+    errorHappened = 1;
+  }
+}
 void parserDatatypeInit(token *datatypeToken, token *datatypeSecToken,
-                        datatype *typeOut, int ptrDepth, int expectedType) {}
+                        datatype *typeOut, int ptrDepth, int expectedType) {
+  parserInitDatatypeTypeAndSize(datatypeToken, datatypeSecToken, typeOut,
+                                ptrDepth, expectedType);
+  typeOut->typeStr = datatypeToken->sval;
+  if (S_EQ(datatypeToken->sval, "long") && datatypeSecToken &&
+      S_EQ(datatypeSecToken->sval, "long")) {
+    compilerWarning(currentProcess, "Warning: Our compiler doesnt support 64 "
+                                    "bit longs, defaulting to 32 \n");
+    typeOut->size = DATA_SIZE_DWORD;
+  }
+}
 void parseDatatypeType(datatype *type) {
   token *datatypeToken = NULL;
   token *datatypeSecToken = NULL;
@@ -292,13 +389,15 @@ void parseDatatypeType(datatype *type) {
     }
   }
   int ptrDepth = getPtrDepth();
+  parserDatatypeInit(datatypeToken, datatypeSecToken, type, ptrDepth,
+                     expectedType);
 }
 void parseDatatype(datatype *dtype) {
   memset(dtype, 0, sizeof(datatype));
   // in C everything is signed by default
   dtype->flags |= DATATYPE_FLAG_IS_SIGNED;
   parseDatatypeModifiers(dtype);
-
+  parseDatatypeType(dtype);
   parseDatatypeModifiers(dtype);
 }
 void parseVariableFunctionStructUnion(struct history *hs) {
@@ -310,8 +409,11 @@ int parseKeyword(struct history *hs) {
   if (isKeywordVariableModifier(token->sval) ||
       keywordIsDataType(token->sval)) {
     parseVariableFunctionStructUnion(hs);
+    free(hs);
+    return 0;
   }
 
+  // we ll see, maybe free it with garbage vec
   return 0;
 }
 int parseExpressionableSingle(history *hs) {
@@ -343,12 +445,15 @@ void parseExpressionable(history *hs) {
   }
   free(hs);
 }
+void parseKeywordForGlobal() {
+  parseKeyword(historyBegin(0));
+  node *node = nodePop();
+};
 int parseNext() {
 
   token *token = tokenPeekNext();
   if (!token) {
     // check memory cleanup
-    printf("end\n");
     return -1;
   }
 
@@ -359,6 +464,10 @@ int parseNext() {
   case IDENTIFIER:
   case STRING:
     parseExpressionable(historyBegin(0));
+    break;
+  case KEYWORD:
+    parseKeywordForGlobal();
+    res = 0;
     break;
   }
   return res;
@@ -372,8 +481,11 @@ int parse(compileProcess *process) {
 
   vector_set_peek_pointer(process->tokenVec, 0);
   while (parseNext() == 0) {
-    node = nodePeek();
-    vector_push(process->nodeTreeVec, &node);
+    // MAYBE USE nodePeek()
+    node = nodePeekOrNull();
+    if (node) {
+      vector_push(process->nodeTreeVec, &node);
+    }
   }
 
   vector_set_peek_pointer(currentProcess->nodeVec, 0);
