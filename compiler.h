@@ -2,6 +2,7 @@
 
 #include "compileProcess.h"
 #include "node.h"
+#include <stddef.h>
 
 #define S_EQ(str, str2) (str && str2 && (strcmp(str, str2) == 0))
 #define SYMBOL_CASE                                                            \
@@ -114,3 +115,50 @@ bool nodeIsExpressionable(node *node);
 node *nodeCreate(node *_node);
 node *nodePeekExpressionableOrNull();
 node *makeExpNode(node *left, node *right, const char *op);
+bool keywordIsDataType(const char *str);
+
+enum {
+  DATATYPE_FLAG_IS_SIGNED = 0b00000001,
+  DATATYPE_FLAG_IS_STATIC = 0b00000010,
+  DATATYPE_FLAG_IS_CONST = 0b00000100,
+  DATATYPE_FLAG_IS_POINTER = 0b00001000,
+  DATATYPE_FLAG_IS_ARRAY = 0b00010000,
+  DATATYPE_FLAG_IS_EXTERN = 0b00100000,
+  DATATYPE_FLAG_IS_RESTRICT = 0b01000000,
+  DATATYPE_FLAG_IGNORE_TYPE_CHECKING = 0b10000000,
+  DATATYPE_FLAG_IS_SECONDARY = 0b100000000,
+  DATATYPE_FLAG_STRUCT_UNION_NO_NAME = 0b1000000000,
+  DATATYPE_FLAG_IS_LITERAL = 0b10000000000,
+};
+enum {
+  DATA_TYPE_VOID,
+  DATA_TYPE_CHAR,
+  DATA_TYPE_SHORT,
+  DATA_TYPE_INTEGER,
+  DATA_TYPE_LONG,
+  DATA_TYPE_FLOAT,
+  DATA_TYPE_DOUBLE,
+  DATA_TYPE_STRUCT,
+  DATA_TYPE_UNION,
+  DATA_TYPE_UNKNOWN
+};
+typedef struct datatype {
+  int flags;
+  int type;
+  struct datatype *secondary;
+  const char *typeStr;
+  size_t size;
+  int ptrDepth;
+  union {
+    node *structNode;
+    node *unionNode;
+  };
+} datatype;
+bool tokenIsPrimitiveKeyword(token *token);
+enum {
+  DATA_TYPE_EXPECT_PRIMITIVE,
+  DATA_TYPE_EXPECT_UNION,
+  DATA_TYPE_EXPECT_STRUCT
+};
+bool datatypeIsStructOrUnionForName(const char *name);
+bool tokenIsOperator(token *token, const char *val);
