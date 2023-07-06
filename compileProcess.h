@@ -3,6 +3,13 @@
 #include "token.h"
 
 enum { COMPILER_FILE_COMPILED_OK, COMPILER_FILE_COMPILED_WITH_ERRORS };
+typedef struct scope {
+  int flags;
+  struct vector *entities;
+  size_t size;
+  struct scope *parent;
+
+} scope;
 
 typedef struct compileProcess {
   int flags;
@@ -17,6 +24,10 @@ typedef struct compileProcess {
   struct vector *nodeTreeVec;
   struct vector *garbageVec;
   struct vector *garbageDatatypes;
+  struct {
+    scope *root;
+    scope *current;
+  } scope;
 
 } compileProcess;
 

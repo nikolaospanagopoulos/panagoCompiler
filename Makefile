@@ -1,4 +1,4 @@
-OBJECTS= ./build/vector.o ./build/compiler.o ./build/compileProcess.o ./build/buffer.o ./build/lexProcess.o ./build/lexer.o ./build/token.o ./build/parser.o ./build/node.o ./build/expressionable.o ./build/datatype.o
+OBJECTS= ./build/vector.o ./build/compiler.o ./build/compileProcess.o ./build/buffer.o ./build/lexProcess.o ./build/lexer.o ./build/token.o ./build/parser.o ./build/node.o ./build/expressionable.o ./build/datatype.o ./build/scope.o
 
 all: ${OBJECTS}
 	gcc main.c ${OBJECTS}  -g -o ./bin/main
@@ -24,6 +24,8 @@ all: ${OBJECTS}
 	gcc ./expressionable.c -o ./build/expressionable.o -g -c
 ./build/datatype.o: ./datatype.c
 	gcc ./datatype.c -o ./build/datatype.o -g -c
+./build/scope.o: ./scope.c
+	gcc ./scope.c -o ./build/scope.o -g -c
 clean:
 	rm ./bin/main
 	rm -rf ${OBJECTS}
