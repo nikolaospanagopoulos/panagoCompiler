@@ -1,1 +1,1 @@
-long long
+int 4

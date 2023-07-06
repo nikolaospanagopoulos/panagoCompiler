@@ -400,9 +400,31 @@ void parseDatatype(datatype *dtype) {
   parseDatatypeType(dtype);
   parseDatatypeModifiers(dtype);
 }
+void parserIgnoreInt(datatype *datatype);
 void parseVariableFunctionStructUnion(struct history *hs) {
   datatype dtype;
   parseDatatype(&dtype);
+  parserIgnoreInt(&dtype);
+  token *namedToken = tokenNext();
+  if (namedToken->type != IDENTIFIER) {
+    compilerError(currentProcess,
+                  "Expecting a valid name after variable decleration\n");
+    errorHappened = 1;
+  }
+}
+bool parserIsIntValidAfterDatatype(datatype *type) {
+  return type->type == DATA_TYPE_LONG || type->type == DATA_TYPE_FLOAT ||
+         type->type == DATA_TYPE_DOUBLE;
+}
+void parserIgnoreInt(datatype *datatype) {
+  if (!tokenIsKeyword(tokenPeekNext(), "int")) {
+    return;
+  }
+  if (!parserIsIntValidAfterDatatype(datatype)) {
+    errorHappened = 1;
+    compilerError(currentProcess, "Not valid int decleration \n");
+  }
+  tokenNext();
 }
 int parseKeyword(struct history *hs) {
   token *token = tokenPeekNext();

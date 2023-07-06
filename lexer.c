@@ -23,7 +23,7 @@ static char nextc() {
     buffer_write(lex_Process->parenthesesBuffer, c);
   }
   lex_Process->pos.col += 1;
-  if (c != '\n') {
+  if (c == '\n') {
     lex_Process->pos.line += 1;
     lex_Process->pos.col = 1;
   }

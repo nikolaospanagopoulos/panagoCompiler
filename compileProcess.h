@@ -11,6 +11,14 @@ typedef struct scope {
 
 } scope;
 
+enum { SYMBOL_TYPE_NODE, SYMBOL_TYPE_NATIVE_FUNCTION, SYMBOL_TYPE_UNKNOWN };
+
+typedef struct symbol {
+  const char *name;
+  int type;
+  void *data;
+} symbol;
+
 typedef struct compileProcess {
   int flags;
   pos position;
@@ -28,7 +36,10 @@ typedef struct compileProcess {
     scope *root;
     scope *current;
   } scope;
-
+  struct {
+    struct vector *table;
+    struct vector *tables;
+  } symbols;
 } compileProcess;
 
 void freeCompileProcess(compileProcess *cp);
