@@ -22,12 +22,14 @@ typedef struct history {
 history *historyBegin(int flags) {
   history *history = calloc(1, sizeof(struct history));
   history->flags = flags;
+  vector_push(currentProcess->gb, &history);
   return history;
 }
 history *historyDown(history *hs, int flags) {
   history *newHistory = calloc(1, sizeof(history));
   memcpy(newHistory, hs, sizeof(history));
   newHistory->flags = flags;
+  vector_push(currentProcess->gb, &newHistory);
   return newHistory;
 }
 
@@ -52,10 +54,15 @@ static void parserIgnoreNlOrComment(token *token) {
 
 static token *tokenNext() {
   token *nextToken = vector_peek_no_increment(currentProcess->tokenVec);
+  // maybe needs to change
+  if (!nextToken) {
+    return NULL;
+  }
   parserIgnoreNlOrComment(nextToken);
   currentProcess->position = nextToken->position;
   parserLastToken = nextToken;
-  return vector_peek(currentProcess->tokenVec);
+  token *toReturn = vector_peek(currentProcess->tokenVec);
+  return toReturn;
 }
 static token *tokenPeekNext() {
   token *nextToken = vector_peek_no_increment(currentProcess->tokenVec);
@@ -294,7 +301,7 @@ void parserDatatypeAdjustSizeForSecondary(datatype *datatype,
   parserDatatypeInitSizeAndTypeForPrimitive(datatypeSecToken, NULL,
 
                                             secondaryDataType);
-  vector_push(currentProcess->garbageDatatypes, &secondaryDataType);
+  vector_push(currentProcess->gb, &secondaryDataType);
   datatype->size += secondaryDataType->size;
   datatype->secondary = secondaryDataType;
   datatype->flags |= DATATYPE_FLAG_IS_SECONDARY;
@@ -401,16 +408,52 @@ void parseDatatype(datatype *dtype) {
   parseDatatypeModifiers(dtype);
 }
 void parserIgnoreInt(datatype *datatype);
+
+void parseExpressionableRoot(history *hs) {
+  parseExpressionable(hs);
+  node *resultNode = nodePop();
+  nodePush(resultNode);
+}
+void makeVariableNode(datatype *dtype, token *name, node *valueNode) {
+  const char *nameStr = NULL;
+  if (name) {
+    nameStr = name->sval;
+  }
+  nodeCreate(&(struct node){.type = NODE_TYPE_VARIABLE,
+                            .var.name = nameStr,
+                            .var.val = valueNode,
+                            .var.type = *dtype});
+}
+void makeVariableNodeAndRegister(history *hs, datatype *dtype, token *name,
+                                 node *valueNode) {
+  makeVariableNode(dtype, name, valueNode);
+  node *varNode = nodePop();
+  // cleanup
+  nodePush(varNode);
+}
+void parseVariable(datatype *dtype, token *namedToken, history *hs) {
+  node *valueNode = NULL;
+  if (tokenNextIsOperator("=")) {
+    // ignore =
+    //  int x = 50;
+    //  x 50
+    tokenNext();
+    parseExpressionableRoot(hs);
+    valueNode = nodePop();
+  }
+  makeVariableNodeAndRegister(hs, dtype, namedToken, valueNode);
+}
 void parseVariableFunctionStructUnion(struct history *hs) {
   datatype dtype;
   parseDatatype(&dtype);
   parserIgnoreInt(&dtype);
   token *namedToken = tokenNext();
-  if (namedToken->type != IDENTIFIER) {
+  if ((namedToken && namedToken->type != IDENTIFIER) || (!namedToken)) {
     compilerError(currentProcess,
                   "Expecting a valid name after variable decleration\n");
     errorHappened = 1;
   }
+  parseVariable(&dtype, namedToken, hs);
 }
 bool parserIsIntValidAfterDatatype(datatype *type) {
   return type->type == DATA_TYPE_LONG || type->type == DATA_TYPE_FLOAT ||
@@ -431,8 +474,6 @@ int parseKeyword(struct history *hs) {
   if (isKeywordVariableModifier(token->sval) ||
       keywordIsDataType(token->sval)) {
     parseVariableFunctionStructUnion(hs);
-    free(hs);
-    return 0;
   }
 
   // we ll see, maybe free it with garbage vec
@@ -465,11 +506,11 @@ int parseExpressionableSingle(history *hs) {
 void parseExpressionable(history *hs) {
   while (parseExpressionableSingle(hs) == 0) {
   }
-  free(hs);
 }
 void parseKeywordForGlobal() {
   parseKeyword(historyBegin(0));
   node *node = nodePop();
+  nodePush(node);
 };
 int parseNext() {
 
@@ -498,7 +539,7 @@ int parseNext() {
 int parse(compileProcess *process) {
   currentProcess = process;
   parserLastToken = NULL;
-  nodeSetVector(process->nodeVec, process->nodeTreeVec, process->garbageVec);
+  nodeSetVector(process->nodeVec, process->nodeTreeVec, process->gb);
   struct node *node = NULL;
 
   vector_set_peek_pointer(process->tokenVec, 0);

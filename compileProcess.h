@@ -30,8 +30,7 @@ typedef struct compileProcess {
   struct vector *tokenVec;
   struct vector *nodeVec;
   struct vector *nodeTreeVec;
-  struct vector *garbageVec;
-  struct vector *garbageDatatypes;
+  struct vector *gb;
   struct {
     scope *root;
     scope *current;

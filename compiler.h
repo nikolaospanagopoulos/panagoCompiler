@@ -141,18 +141,6 @@ enum {
   DATA_TYPE_UNION,
   DATA_TYPE_UNKNOWN
 };
-typedef struct datatype {
-  int flags;
-  int type;
-  struct datatype *secondary;
-  const char *typeStr;
-  size_t size;
-  int ptrDepth;
-  union {
-    node *structNode;
-    node *unionNode;
-  };
-} datatype;
 bool tokenIsPrimitiveKeyword(token *token);
 enum {
   DATA_TYPE_EXPECT_PRIMITIVE,

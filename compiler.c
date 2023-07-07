@@ -60,15 +60,6 @@ int compileFile(const char *filename, const char *outFileName, int flags) {
   setCompileProcessLexProcess(process, lexProcess);
   if (parse(process) != PARSE_ALL_OK) {
 
-    vector_set_peek_pointer(process->nodeTreeVec, 0);
-    struct node **node = (struct node **)vector_peek(process->nodeTreeVec);
-
-    while (node) {
-
-      free(*node);
-      node = (struct node **)vector_peek(process->nodeTreeVec);
-    }
-
     freeLexProcess(lexProcess);
     freeCompileProcess(process);
     free(process);

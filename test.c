@@ -1,1 +1,1 @@
-int 4
+long long int x = 50

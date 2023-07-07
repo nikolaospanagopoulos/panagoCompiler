@@ -1,5 +1,7 @@
 #pragma once
+#include "datatype.h"
 #include "position.h"
+#include <stddef.h>
 
 enum {
   NODE_TYPE_EXPRESSION,
@@ -33,7 +35,19 @@ enum {
   NODE_TYPE_CAST,
   NODE_TYPE_BLANK
 };
-
+struct node;
+typedef struct datatype {
+  int flags;
+  int type;
+  struct datatype *secondary;
+  const char *typeStr;
+  size_t size;
+  int ptrDepth;
+  union {
+    struct node *structNode;
+    struct node *unionNode;
+  };
+} datatype;
 typedef struct node {
   int type;
   int flags;
@@ -48,7 +62,13 @@ typedef struct node {
       struct node *right;
       const char *op;
     } exp;
+    struct var {
+      struct datatype type;
+      const char *name;
+      struct node *val;
+    } var;
   };
+
   union {
     char cval;
     char *sval;

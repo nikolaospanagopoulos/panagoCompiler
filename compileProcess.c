@@ -37,31 +37,6 @@ void freeNode(struct node *node) {
     free(node);
   }
 }
-void printNode(struct node *node) {
-  if (node == NULL) {
-    return; // Base case: reached the end of the tree
-  }
-
-  printNode(node->exp.left);
-
-  if (node) {
-    if (node->type == NODE_TYPE_NUMBER) {
-      printf("NUM: %llu \n", node->llnum);
-    }
-  }
-
-  printNode(node->exp.right);
-}
-void printNodeTreeVector(compileProcess *cp) {
-
-  vector_set_peek_pointer(cp->nodeTreeVec, 0);
-  struct node **node = (struct node **)vector_peek(cp->nodeTreeVec);
-  while (node) {
-    printNode(*node);
-
-    node = (struct node **)vector_peek(cp->nodeTreeVec);
-  }
-}
 void freeCompileProcess(compileProcess *cp) {
   if (cp->cfile.fp) {
     fclose(cp->cfile.fp);
@@ -70,23 +45,16 @@ void freeCompileProcess(compileProcess *cp) {
     fclose(cp->outFile);
   }
 
-  printNodeTreeVector(cp);
-  vector_set_peek_pointer(cp->garbageVec, 0);
-  struct node **nodeg = (struct node **)vector_peek(cp->garbageVec);
-  while (nodeg) {
-    freeNode(*nodeg);
-    nodeg = (struct node **)vector_peek(cp->garbageVec);
+  vector_set_peek_pointer(cp->gb, 0);
+  void **data = (void **)vector_peek(cp->gb);
+  while (data) {
+    free(*data);
+    data = (void **)vector_peek(cp->gb);
   }
 
-  struct datatype **dt = (struct datatype **)vector_peek(cp->garbageDatatypes);
-  while (dt) {
-    free(*dt);
-    dt = (struct datatype **)vector_peek(cp->garbageDatatypes);
-  }
   vector_free(cp->nodeTreeVec);
   vector_free(cp->nodeVec);
-  vector_free(cp->garbageVec);
-  vector_free(cp->garbageDatatypes);
+  vector_free(cp->gb);
 }
 
 compileProcess *compileProcessCreate(const char *filename,
@@ -109,8 +77,7 @@ compileProcess *compileProcessCreate(const char *filename,
   process->outFile = outFile;
   process->nodeVec = vector_create(sizeof(struct node *));
   process->nodeTreeVec = vector_create(sizeof(struct node *));
-  process->garbageVec = vector_create(sizeof(struct node *));
-  process->garbageDatatypes = vector_create(sizeof(datatype *));
+  process->gb = vector_create(sizeof(void *));
 
   return process;
 }
