@@ -31,7 +31,30 @@ struct vector *getArrayBracketsNodeVec(struct arrayBrackets *brackets) {
 size_t arrayBracketsCalculateSizeFromIndex(struct datatype *dtype,
                                            struct arrayBrackets *brackets,
                                            int index) {
-  return 0;
+  struct vector *arrayVec = getArrayBracketsNodeVec(brackets);
+  size_t size = dtype->size;
+  if (index >= vector_count(arrayVec)) {
+    return size;
+  }
+  vector_set_peek_pointer(arrayVec, index);
+  node *arrayBracketNode = vector_peek_ptr(arrayVec);
+  if (!arrayBracketNode) {
+    return 0;
+  }
+  while (arrayBracketNode) {
+
+    if (arrayBracketNode->bracket.inner->type != NODE_TYPE_NUMBER) {
+      compilerError(cprocess, "Not a number inside array brackets\n");
+      freeLexProcess(lexPr);
+      freeCompileProcess(cprocess);
+      exit(-1);
+    }
+
+    int number = arrayBracketNode->bracket.inner->llnum;
+    size *= number;
+    arrayBracketNode = vector_peek_ptr(arrayVec);
+  }
+  return size;
 }
 
 size_t arrayBracketsCalcSize(struct datatype *dtype,
@@ -43,6 +66,7 @@ int arrayTotalIndexes(struct datatype *dtype) {
     compilerError(cprocess, "The datatype is not a bracket \n");
     freeLexProcess(lexPr);
     freeCompileProcess(cprocess);
+    exit(-1);
   }
   struct arrayBrackets *brackets = dtype->array.brackets;
   return vector_count(brackets->nBrackets);
