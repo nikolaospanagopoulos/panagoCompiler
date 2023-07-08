@@ -419,10 +419,39 @@ void makeVariableNode(datatype *dtype, token *name, node *valueNode) {
   if (name) {
     nameStr = name->sval;
   }
-  nodeCreate(&(struct node){.type = NODE_TYPE_VARIABLE,
-                            .var.name = nameStr,
-                            .var.val = valueNode,
-                            .var.type = *dtype});
+
+  node *f = nodeCreate(&(struct node){.type = NODE_TYPE_VARIABLE,
+                                      .var.name = nameStr,
+                                      .var.val = valueNode,
+                                      .var.type = *dtype});
+}
+static void expectOp(const char *op) {
+  struct token *nextToken = tokenNext();
+  if (!nextToken || nextToken->type != OPERATOR || !S_EQ(nextToken->sval, op)) {
+    compilerError(
+        currentProcess,
+        "Expecting the operator %s, but something else was provided\n",
+        nextToken->sval);
+    errorHappened = 1;
+  }
+}
+static void expectSym(char c);
+struct arrayBrackets *parseArrayBrackets(struct history *hs) {
+  struct arrayBrackets *brackets = arrayBracketsNew();
+  while (tokenNextIsOperator("[")) {
+    expectOp("[");
+    if (tokenIsSymbol(tokenPeekNext(), ']')) {
+      expectSym(']');
+      break;
+    }
+    parseExpressionableRoot(hs);
+    expectSym(']');
+    node *expNode = nodePop();
+    makeBracketNode(expNode);
+    node *bracketNode = nodePop();
+    arrayBracketsAdd(brackets, bracketNode);
+  }
+  return brackets;
 }
 void makeVariableNodeAndRegister(history *hs, datatype *dtype, token *name,
                                  node *valueNode) {
@@ -433,6 +462,13 @@ void makeVariableNodeAndRegister(history *hs, datatype *dtype, token *name,
 }
 void parseVariable(datatype *dtype, token *namedToken, history *hs) {
   node *valueNode = NULL;
+  struct arrayBrackets *brackets = NULL;
+  if (tokenNextIsOperator("[")) {
+    brackets = parseArrayBrackets(hs);
+    dtype->array.brackets = brackets;
+    dtype->array.size = arrayBracketsCalcSize(dtype, brackets);
+    dtype->flags |= DATATYPE_FLAG_IS_ARRAY;
+  }
   if (tokenNextIsOperator("=")) {
     // ignore =
     //  int x = 50;
@@ -442,6 +478,19 @@ void parseVariable(datatype *dtype, token *namedToken, history *hs) {
     valueNode = nodePop();
   }
   makeVariableNodeAndRegister(hs, dtype, namedToken, valueNode);
+}
+static void expectSym(char c) {
+  token *nextToken = tokenNext();
+  if (!nextToken || nextToken->type != SYMBOL || nextToken->cval != c) {
+    compilerError(currentProcess,
+                  "Expected symbol %c but something else was provided \n", c);
+    errorHappened = 1;
+  }
+}
+void makeVariableListNode(struct vector *varlistVec) {
+  node *toCreate = nodeCreate(&(struct node){.type = NODE_TYPE_VARIABLE_LIST});
+
+  toCreate->varlist.list = varlistVec;
 }
 void parseVariableFunctionStructUnion(struct history *hs) {
   datatype dtype;
@@ -454,6 +503,20 @@ void parseVariableFunctionStructUnion(struct history *hs) {
     errorHappened = 1;
   }
   parseVariable(&dtype, namedToken, hs);
+  if (tokenIsOperator(tokenPeekNext(), ",")) {
+    struct vector *varList = vector_create(sizeof(struct node *));
+    node *varNode = nodePop();
+    vector_push(varList, &varNode);
+    while (tokenIsOperator(tokenPeekNext(), ",")) {
+      tokenNext();
+      namedToken = tokenNext();
+      parseVariable(&dtype, namedToken, hs);
+      varNode = nodePop();
+      vector_push(varList, &varNode);
+    }
+    makeVariableListNode(varList);
+  }
+  expectSym(';');
 }
 bool parserIsIntValidAfterDatatype(datatype *type) {
   return type->type == DATA_TYPE_LONG || type->type == DATA_TYPE_FLOAT ||
@@ -474,6 +537,7 @@ int parseKeyword(struct history *hs) {
   if (isKeywordVariableModifier(token->sval) ||
       keywordIsDataType(token->sval)) {
     parseVariableFunctionStructUnion(hs);
+    return 0;
   }
 
   // we ll see, maybe free it with garbage vec
@@ -539,7 +603,9 @@ int parseNext() {
 int parse(compileProcess *process) {
   currentProcess = process;
   parserLastToken = NULL;
-  nodeSetVector(process->nodeVec, process->nodeTreeVec, process->gb);
+  nodeSetVector(process->nodeVec, process->nodeTreeVec,
+                process->nodeGarbageVec);
+
   struct node *node = NULL;
 
   vector_set_peek_pointer(process->tokenVec, 0);

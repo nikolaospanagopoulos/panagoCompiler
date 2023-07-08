@@ -33,6 +33,15 @@ void freeNode(struct node *node) {
     return;
   }
 
+  if (node->type == NODE_TYPE_VARIABLE_LIST) {
+    vector_free(node->varlist.list);
+  }
+
+  if (node->var.type.array.brackets &&
+      node->var.type.array.brackets->nBrackets) {
+    vector_free(node->var.type.array.brackets->nBrackets);
+    free(node->var.type.array.brackets);
+  }
   if (node) {
     free(node);
   }
@@ -45,15 +54,22 @@ void freeCompileProcess(compileProcess *cp) {
     fclose(cp->outFile);
   }
 
+  vector_set_peek_pointer(cp->nodeGarbageVec, 0);
+  node **node = (struct node **)vector_peek(cp->nodeGarbageVec);
+  while (node) {
+
+    freeNode(*node);
+    node = (struct node **)vector_peek(cp->nodeGarbageVec);
+  }
   vector_set_peek_pointer(cp->gb, 0);
   void **data = (void **)vector_peek(cp->gb);
   while (data) {
     free(*data);
     data = (void **)vector_peek(cp->gb);
   }
-
   vector_free(cp->nodeTreeVec);
   vector_free(cp->nodeVec);
+  vector_free(cp->nodeGarbageVec);
   vector_free(cp->gb);
 }
 
@@ -77,7 +93,7 @@ compileProcess *compileProcessCreate(const char *filename,
   process->outFile = outFile;
   process->nodeVec = vector_create(sizeof(struct node *));
   process->nodeTreeVec = vector_create(sizeof(struct node *));
+  process->nodeGarbageVec = vector_create(sizeof(struct node *));
   process->gb = vector_create(sizeof(void *));
-
   return process;
 }

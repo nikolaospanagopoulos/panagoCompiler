@@ -58,6 +58,7 @@ int compileFile(const char *filename, const char *outFileName, int flags) {
   // maybe check when to clean vector
   process->tokenVec = lexProcess->tokenVec;
   setCompileProcessLexProcess(process, lexProcess);
+  setLexProcessCompileProcess(lexProcess, process);
   if (parse(process) != PARSE_ALL_OK) {
 
     freeLexProcess(lexProcess);

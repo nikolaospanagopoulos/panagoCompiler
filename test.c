@@ -1,1 +1,1 @@
-long long int x = 50
+int x[4][3];

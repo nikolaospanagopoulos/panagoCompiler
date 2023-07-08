@@ -47,7 +47,6 @@ bool nodeIsExpressionable(node *node) {
 node *nodeCreate(node *_node) {
   node *node = malloc(sizeof(struct node));
   memcpy(node, _node, sizeof(struct node));
-
   garpush(node);
   nodePush(node);
 
@@ -56,7 +55,7 @@ node *nodeCreate(node *_node) {
 node *nodeCreateNotPush(node *_node) {
   node *node = malloc(sizeof(struct node));
   memcpy(node, _node, sizeof(struct node));
-
+  node->varlist.list = NULL;
   return node;
 }
 node *nodePeekExpressionableOrNull() {
@@ -74,4 +73,7 @@ node *makeExpNode(node *left, node *right, const char *op) {
                                       .exp.op = op});
 
   return tocreate;
+}
+void makeBracketNode(node *node) {
+  nodeCreate(&(struct node){.type = NODE_TYPE_BRACKET, .bracket.inner = node});
 }

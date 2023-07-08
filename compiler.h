@@ -117,19 +117,6 @@ node *makeExpNode(node *left, node *right, const char *op);
 bool keywordIsDataType(const char *str);
 
 enum {
-  DATATYPE_FLAG_IS_SIGNED = 0b00000001,
-  DATATYPE_FLAG_IS_STATIC = 0b00000010,
-  DATATYPE_FLAG_IS_CONST = 0b00000100,
-  DATATYPE_FLAG_IS_POINTER = 0b00001000,
-  DATATYPE_FLAG_IS_ARRAY = 0b00010000,
-  DATATYPE_FLAG_IS_EXTERN = 0b00100000,
-  DATATYPE_FLAG_IS_RESTRICT = 0b01000000,
-  DATATYPE_FLAG_IGNORE_TYPE_CHECKING = 0b10000000,
-  DATATYPE_FLAG_IS_SECONDARY = 0b100000000,
-  DATATYPE_FLAG_STRUCT_UNION_NO_NAME = 0b1000000000,
-  DATATYPE_FLAG_IS_LITERAL = 0b10000000000,
-};
-enum {
   DATA_TYPE_VOID,
   DATA_TYPE_CHAR,
   DATA_TYPE_SHORT,
@@ -156,3 +143,14 @@ enum {
   DATA_SIZE_DWORD = 4,
   DATA_SIZE_DDWORD = 8
 };
+int arrayTotalIndexes(struct datatype *dtype);
+size_t arrayBracketsCalcSize(struct datatype *dtype,
+                             struct arrayBrackets *brackets);
+size_t arrayBracketsCalculateSizeFromIndex(struct datatype *dtype,
+                                           struct arrayBrackets *brackets,
+                                           int index);
+void arrayBracketsAdd(struct arrayBrackets *brackets, node *bracketNode);
+struct arrayBrackets *arrayBracketsNew();
+void setLexProcessCompileProcess(struct lexProcess *lpr,
+                                 struct compileProcess *process);
+void makeBracketNode(node *node);
