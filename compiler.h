@@ -61,7 +61,7 @@ enum { INSIDE_EXPRESSION = 0b00000001 };
 typedef struct lexProcess {
   pos pos;
   struct vector *tokenVec;
-  compileProcess *compiler;
+  struct compileProcess *compiler;
   int currentExpressionCount;
   struct buffer *parenthesesBuffer;
   struct lexProcessFunctions *function;

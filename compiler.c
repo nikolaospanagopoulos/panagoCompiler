@@ -6,7 +6,10 @@
 #include "vector.h"
 #include <stdarg.h>
 #include <stdio.h>
-
+static struct lexProcess *lrxPr;
+static void setLexProcessForCompileProcess(struct lexProcess *pr) {
+  lrxPr = pr;
+}
 void compilerError(compileProcess *compiler, const char *msg, ...) {
   va_list args;
   va_start(args, msg);
@@ -14,6 +17,10 @@ void compilerError(compileProcess *compiler, const char *msg, ...) {
   va_end(args);
   fprintf(stderr, " on line %i, col %i, in file %s\n", compiler->position.line,
           compiler->position.col, compiler->position.filename);
+  freeLexProcess(lrxPr);
+  freeCompileProcess(compiler);
+  free(compiler);
+  exit(-1);
 }
 void compilerWarning(compileProcess *compiler, const char *msg, ...) {
   va_list args;
@@ -40,6 +47,7 @@ int compileFile(const char *filename, const char *outFileName, int flags) {
   lexProcess *lexProcess =
       lexProcessCreate(process, &compilerLexFunctions, NULL);
 
+  setLexProcessForCompileProcess(lexProcess);
   if (!lexProcess) {
     freeCompileProcess(process);
     free(process);

@@ -611,6 +611,10 @@ int parse(compileProcess *process) {
   vector_set_peek_pointer(process->tokenVec, 0);
   while (parseNext() == 0) {
     // MAYBE USE nodePeek()
+
+    if (errorHappened != 0) {
+      return PARSE_ERROR;
+    }
     node = nodePeekOrNull();
     if (node) {
       vector_push(process->nodeTreeVec, &node);
