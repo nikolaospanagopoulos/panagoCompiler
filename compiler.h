@@ -154,3 +154,12 @@ struct arrayBrackets *arrayBracketsNew();
 void setLexProcessCompileProcess(struct lexProcess *lpr,
                                  struct compileProcess *process);
 void makeBracketNode(node *node);
+bool dataTypeIsStructOrUnion(struct datatype *dtype);
+scope *scopeNew(compileProcess *process, int flags);
+scope *createRootScope(compileProcess *cp);
+void scopeFinish(compileProcess *cp);
+void parserScopeFinish(compileProcess *currentProcess);
+void scopeDealloc(scope *scope);
+void scopeFreeRoot(compileProcess *cp);
+void makeBodyNode(struct vector *bodyVec, size_t size, bool padded,
+                  struct node *largestVarNode);

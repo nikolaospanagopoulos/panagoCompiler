@@ -37,6 +37,9 @@ void freeNode(struct node *node) {
     vector_free(node->varlist.list);
   }
 
+  if (node->body.statements != NULL) {
+    vector_free(node->body.statements);
+  }
   if (node->var.type.array.brackets &&
       node->var.type.array.brackets->nBrackets) {
     vector_free(node->var.type.array.brackets->nBrackets);
@@ -70,6 +73,7 @@ void freeCompileProcess(compileProcess *cp) {
   vector_free(cp->nodeTreeVec);
   vector_free(cp->nodeVec);
   vector_free(cp->nodeGarbageVec);
+  scopeFreeRoot(cp);
   vector_free(cp->gb);
 }
 

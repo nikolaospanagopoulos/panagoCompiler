@@ -86,6 +86,10 @@ void scopePush(compileProcess *cp, void *ptr, size_t elemSize) {
   vector_push(cp->scope.current->entities, &ptr);
   cp->scope.current->size += elemSize;
 }
+
+void parserScopeFinish(compileProcess *currentProcess) {
+  scopeFinish(currentProcess);
+}
 void scopeFinish(compileProcess *cp) {
   scope *newCurrentScope = cp->scope.current->parent;
   scopeDealloc(cp->scope.current);

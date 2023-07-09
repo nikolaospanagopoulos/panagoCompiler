@@ -3,6 +3,7 @@
 #include "vector.h"
 #include <assert.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,6 +11,7 @@
 struct vector *nodeVector = NULL;
 struct vector *nodeVectorRoot = NULL;
 struct vector *garbage = NULL;
+struct node *parserCurrentBody = NULL;
 
 void nodeSetVector(struct vector *vec, struct vector *rootVec,
                    struct vector *garbageVec) {
@@ -76,4 +78,12 @@ node *makeExpNode(node *left, node *right, const char *op) {
 }
 void makeBracketNode(node *node) {
   nodeCreate(&(struct node){.type = NODE_TYPE_BRACKET, .bracket.inner = node});
+}
+void makeBodyNode(struct vector *bodyVec, size_t size, bool padded,
+                  struct node *largestVarNode) {
+  nodeCreate(&(struct node){.type = NODE_TYPE_BODY,
+                            .body.statements = bodyVec,
+                            .body.size = size,
+                            .body.padded = padded,
+                            .body.largestVarNode = largestVarNode});
 }

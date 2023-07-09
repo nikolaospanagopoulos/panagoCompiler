@@ -1,6 +1,6 @@
 #pragma once
-#include "datatype.h"
 #include "position.h"
+#include <stdbool.h>
 #include <stddef.h>
 
 enum {
@@ -93,6 +93,17 @@ typedef struct node {
     struct bracket {
       struct node *inner;
     } bracket;
+    struct _struct {
+      const char *name;
+      struct node *body_n;
+      struct node *var;
+    } _struct;
+    struct body {
+      struct vector *statements;
+      size_t size;
+      bool padded;
+      struct node *largestVarNode;
+    } body;
   };
 
   union {

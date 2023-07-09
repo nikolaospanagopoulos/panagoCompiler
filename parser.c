@@ -5,13 +5,13 @@
 #include "token.h"
 #include "vector.h"
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-int errorHappened = 0;
 static struct compileProcess *currentProcess;
 static token *parserLastToken;
-
+extern struct node *parserCurrentBody;
 extern struct expressionableOpPrecedenceGroup
     opPrecedence[TOTAL_OPERATOR_GROUPS];
 
@@ -19,6 +19,7 @@ typedef struct history {
   int flags;
 } history;
 
+int parseKeyword(struct history *hs);
 history *historyBegin(int flags) {
   history *history = calloc(1, sizeof(struct history));
   history->flags = flags;
@@ -36,7 +37,6 @@ history *historyDown(history *hs, int flags) {
 bool tokenIsSymbol(token *token, char c) {
   return token && token->type == SYMBOL && token->cval == c;
 }
-
 static bool tokenIsNewLineOrComment(token *token) {
   if (!token) {
     return false;
@@ -70,6 +70,10 @@ static token *tokenPeekNext() {
   return vector_peek_no_increment(currentProcess->tokenVec);
 }
 
+static bool tokenNextIsSymbol(char c) {
+  struct token *token = tokenPeekNext();
+  return tokenIsSymbol(token, c);
+}
 void parseSingleTokenToNode() {
   token *token = tokenNext();
   node *node = NULL;
@@ -89,7 +93,6 @@ void parseSingleTokenToNode() {
     break;
   default:
     compilerError(currentProcess, "This token cannot be converted into a node");
-    errorHappened = 1;
   }
 }
 void parseExpressionable(history *hs);
@@ -127,7 +130,6 @@ static bool parserLeftOpHasPriority(const char *opleft, const char *opright) {
 node *nodeShiftChildrenLeft(node *node) {
   if (node->type != NODE_TYPE_EXPRESSION ||
       node->exp.right->type != NODE_TYPE_EXPRESSION) {
-    errorHappened = 1;
     compilerError(currentProcess, "node is not an expression");
   }
   const char *rightOp = node->exp.right->exp.op;
@@ -196,7 +198,6 @@ int parseExp(history *hs) {
 }
 void parseIdentifier(history *hs) {
   if (tokenPeekNext()->type != IDENTIFIER) {
-    errorHappened = 1;
     compilerError(currentProcess, "Token is not an identifier");
   }
   parseSingleTokenToNode();
@@ -315,7 +316,6 @@ void parserDatatypeInitSizeAndTypeForPrimitive(struct token *datatypeToken,
         currentProcess,
         "You cannot use a secondary datatype for the given datatype %s \n",
         datatypeToken->sval);
-    errorHappened = 1;
   }
   if (S_EQ(datatypeToken->sval, "void")) {
     datatypeOut->type = DATA_TYPE_VOID;
@@ -340,7 +340,6 @@ void parserDatatypeInitSizeAndTypeForPrimitive(struct token *datatypeToken,
     datatypeOut->size = DATA_SIZE_DWORD;
   } else {
     compilerError(currentProcess, "Invalid primitive data type \n");
-    errorHappened = 1;
   }
   parserDatatypeAdjustSizeForSecondary(datatypeOut, datatypeSecToken);
 }
@@ -350,7 +349,6 @@ void parserInitDatatypeTypeAndSize(token *datatypeToken,
 
   if (!secondaryTypeAllowed(expectedType) && datatypeSecToken) {
     compilerError(currentProcess, "You provided an invalid secondary type \n");
-    errorHappened = 1;
   }
   switch (expectedType) {
   case DATA_TYPE_EXPECT_PRIMITIVE:
@@ -360,11 +358,9 @@ void parserInitDatatypeTypeAndSize(token *datatypeToken,
   case DATA_TYPE_EXPECT_STRUCT:
   case DATA_TYPE_EXPECT_UNION:
     compilerError(currentProcess, "Cannot use struct or unions yet \n");
-    errorHappened = 1;
     break;
   default:
     compilerError(currentProcess, "Unsupported datatype expectation \n");
-    errorHappened = 1;
   }
 }
 void parserDatatypeInit(token *datatypeToken, token *datatypeSecToken,
@@ -432,7 +428,6 @@ static void expectOp(const char *op) {
         currentProcess,
         "Expecting the operator %s, but something else was provided\n",
         nextToken->sval);
-    errorHappened = 1;
   }
 }
 static void expectSym(char c);
@@ -484,23 +479,112 @@ static void expectSym(char c) {
   if (!nextToken || nextToken->type != SYMBOL || nextToken->cval != c) {
     compilerError(currentProcess,
                   "Expected symbol %c but something else was provided \n", c);
-    errorHappened = 1;
   }
+}
+void parseSymbol() {
+  compilerError(currentProcess, "Symbols are not yet supported\n");
+}
+void parseStatement(history *hs) {
+  if (tokenPeekNext()->type == KEYWORD) {
+    parseKeyword(hs);
+    return;
+  }
+  parseExpressionableRoot(hs);
+  if (tokenPeekNext()->type == SYMBOL && !tokenIsSymbol(tokenPeekNext(), ';')) {
+    parseSymbol();
+    return;
+  }
+  expectSym(';');
 }
 void makeVariableListNode(struct vector *varlistVec) {
   node *toCreate = nodeCreate(&(struct node){.type = NODE_TYPE_VARIABLE_LIST});
 
   toCreate->varlist.list = varlistVec;
 }
+void parserFinaliseBody(history *hs, node *bodyNode, struct vector *bodyVec,
+                        size_t *varSize, node *largestAlignEligibleNode,
+                        node *largestPossibleVarNode) {
+  bodyNode->body.largestVarNode = largestAlignEligibleNode;
+  bodyNode->body.padded = false;
+  bodyNode->body.size = *varSize;
+  bodyNode->body.statements = bodyVec;
+}
+void parserScopeNew() { scopeNew(currentProcess, 0); }
+
+void parserAppendSizeForNode(history *hs, size_t *varSize, node *node) {
+  compilerWarning(currentProcess,
+                  "Parsing size tracking is not yet supported\n");
+}
+void parseBodySingleStatement(size_t *varSize, struct vector *bodyVec,
+                              history *hs) {
+  makeBodyNode(bodyVec, 0, false, NULL);
+  node *bodyNode = nodePop();
+  bodyNode->binded.owner = parserCurrentBody;
+  parserCurrentBody = bodyNode;
+  node *stmtNode = NULL;
+  parseStatement(historyDown(hs, hs->flags));
+  stmtNode = nodePop();
+  vector_push(bodyVec, &stmtNode);
+  parserAppendSizeForNode(hs, varSize, stmtNode);
+  node *largestVarNode = NULL;
+  if (stmtNode->type == NODE_TYPE_VARIABLE) {
+    largestVarNode = stmtNode;
+  }
+  parserFinaliseBody(hs, bodyNode, bodyVec, varSize, largestVarNode,
+                     largestVarNode);
+  parserCurrentBody = bodyNode->binded.owner;
+  nodePush(bodyNode);
+}
+void parseBody(size_t *variableSize, history *hs) {
+  parserScopeNew();
+  size_t tmpSize = 0x00;
+  if (!variableSize) {
+    variableSize = &tmpSize;
+  }
+  struct vector *bodyVec = vector_create(sizeof(struct node *));
+  if (!tokenNextIsSymbol('{')) {
+    parseBodySingleStatement(variableSize, bodyVec, hs);
+    parserScopeFinish(currentProcess);
+    return;
+  }
+  parserScopeFinish(currentProcess);
+}
+
+void parseStructNoNewScope(datatype *type) {}
+void parseStruct(struct datatype *dtype) {
+  bool isForwardDecleration = !tokenIsSymbol(tokenPeekNext(), '{');
+  if (!isForwardDecleration) {
+    parserScopeNew();
+  }
+  parseStructNoNewScope(dtype);
+  if (!isForwardDecleration) {
+    parserScopeFinish(currentProcess);
+  }
+}
+void parseStructOrUnion(struct datatype *dtype) {
+  switch (dtype->type) {
+  case DATA_TYPE_EXPECT_STRUCT:
+    parseStruct(dtype);
+    break;
+  case DATA_TYPE_UNION:
+    break;
+  default:
+    compilerError(currentProcess,
+                  "The provided data type is not a struct or a union\n");
+  }
+}
 void parseVariableFunctionStructUnion(struct history *hs) {
   datatype dtype;
   parseDatatype(&dtype);
+
+  if (dataTypeIsStructOrUnion(&dtype) && tokenNextIsSymbol('{')) {
+  }
+
   parserIgnoreInt(&dtype);
   token *namedToken = tokenNext();
   if ((namedToken && namedToken->type != IDENTIFIER) || (!namedToken)) {
     compilerError(currentProcess,
                   "Expecting a valid name after variable decleration\n");
-    errorHappened = 1;
   }
   parseVariable(&dtype, namedToken, hs);
   if (tokenIsOperator(tokenPeekNext(), ",")) {
@@ -527,7 +611,6 @@ void parserIgnoreInt(datatype *datatype) {
     return;
   }
   if (!parserIsIntValidAfterDatatype(datatype)) {
-    errorHappened = 1;
     compilerError(currentProcess, "Not valid int decleration \n");
   }
   tokenNext();
@@ -601,6 +684,8 @@ int parseNext() {
 }
 
 int parse(compileProcess *process) {
+
+  createRootScope(process);
   currentProcess = process;
   parserLastToken = NULL;
   nodeSetVector(process->nodeVec, process->nodeTreeVec,
@@ -612,9 +697,6 @@ int parse(compileProcess *process) {
   while (parseNext() == 0) {
     // MAYBE USE nodePeek()
 
-    if (errorHappened != 0) {
-      return PARSE_ERROR;
-    }
     node = nodePeekOrNull();
     if (node) {
       vector_push(process->nodeTreeVec, &node);
@@ -623,8 +705,5 @@ int parse(compileProcess *process) {
 
   vector_set_peek_pointer(currentProcess->nodeVec, 0);
   struct node **nodeToClean = (struct node **)vector_peek(process->nodeVec);
-  if (errorHappened != 0) {
-    return PARSE_ERROR;
-  }
   return PARSE_ALL_OK;
 }
