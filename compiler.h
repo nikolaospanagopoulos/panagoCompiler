@@ -163,3 +163,9 @@ void scopeDealloc(scope *scope);
 void scopeFreeRoot(compileProcess *cp);
 void makeBodyNode(struct vector *bodyVec, size_t size, bool padded,
                   struct node *largestVarNode);
+bool datatypeIsStructOrUnionForName(const char *name);
+bool dataTypeIsStructOrUnion(struct datatype *dtype);
+size_t datatypeElementSize(struct datatype *dtype);
+size_t datatypeSizeForArrayAccess(struct datatype *dtype);
+size_t datatypeSizeNoPtr(struct datatype *dtype);
+size_t datatypeSize(struct datatype *dtype);
