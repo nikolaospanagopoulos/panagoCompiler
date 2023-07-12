@@ -169,3 +169,9 @@ size_t datatypeElementSize(struct datatype *dtype);
 size_t datatypeSizeForArrayAccess(struct datatype *dtype);
 size_t datatypeSizeNoPtr(struct datatype *dtype);
 size_t datatypeSize(struct datatype *dtype);
+void setLexProcessForCompileProcessForHelpers(struct lexProcess *pr,
+                                              struct compileProcess *cp);
+int computeSumPadding(struct vector *vec);
+int padding(int val, int to);
+int alignValue(int val, int to);
+int alignValueAsPositive(int val, int to);

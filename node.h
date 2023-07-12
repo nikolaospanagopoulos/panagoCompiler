@@ -84,6 +84,7 @@ typedef struct node {
     } exp;
     struct var {
       struct datatype type;
+      int padding;
       const char *name;
       struct node *val;
     } var;

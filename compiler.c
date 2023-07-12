@@ -67,6 +67,7 @@ int compileFile(const char *filename, const char *outFileName, int flags) {
   process->tokenVec = lexProcess->tokenVec;
   setCompileProcessLexProcess(process, lexProcess);
   setLexProcessCompileProcess(lexProcess, process);
+
   if (parse(process) != PARSE_ALL_OK) {
 
     freeLexProcess(lexProcess);
