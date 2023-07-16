@@ -87,3 +87,9 @@ void makeBodyNode(struct vector *bodyVec, size_t size, bool padded,
                             .body.padded = padded,
                             .body.largestVarNode = largestVarNode});
 }
+bool nodeIsStructOrUnionVariable(struct node *node) {
+  if (node->type != NODE_TYPE_VARIABLE) {
+    return false;
+  }
+  return dataTypeIsStructOrUnion(&node->var.type);
+}

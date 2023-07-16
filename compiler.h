@@ -175,3 +175,7 @@ int computeSumPadding(struct vector *vec);
 int padding(int val, int to);
 int alignValue(int val, int to);
 int alignValueAsPositive(int val, int to);
+bool nodeIsStructOrUnionVariable(struct node *node);
+size_t variableSize(struct node *varNode);
+node *variableStructOrUnionBodyNode(struct node *node);
+void scopePush(compileProcess *cp, void *ptr, size_t elemSize);

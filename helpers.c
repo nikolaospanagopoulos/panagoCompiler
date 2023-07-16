@@ -82,3 +82,12 @@ int computeSumPadding(struct vector *vec) {
   }
   return padding;
 }
+node *variableStructOrUnionBodyNode(struct node *node) {
+  if (!nodeIsStructOrUnionVariable(node)) {
+    return NULL;
+  }
+  if (node->var.type.type == DATA_TYPE_EXPECT_STRUCT) {
+    return node->var.type.structNode->_struct.body_n;
+  }
+  compilerWarning(process, "Union body not implemented yet \n");
+}

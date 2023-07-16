@@ -15,6 +15,31 @@ extern struct node *parserCurrentBody;
 extern struct expressionableOpPrecedenceGroup
     opPrecedence[TOTAL_OPERATOR_GROUPS];
 
+enum {
+  PARSER_SCOPE_ENTITY_ON_STACK = 0b00000001,
+  PARSER_SCOPE_ENTITY_STRUCTURE_SCOPE = 0b00000011
+
+};
+
+struct parserScopeEntity {
+  int flags;
+  int stackOffset;
+  node *node;
+};
+
+struct parserScopeEntity *parserScopeEntityNew(node *node, int stackOffset,
+                                               int flags) {
+  struct parserScopeEntity *entity =
+      calloc(1, sizeof(struct parserScopeEntity));
+  entity->node = node;
+  entity->flags = flags;
+  entity->stackOffset = stackOffset;
+  vector_push(currentProcess->gb, &entity);
+  return entity;
+}
+
+enum { HISTORY_FLAG_INSIDE_UNION = 0b00000001 };
+
 typedef struct history {
   int flags;
 } history;
@@ -504,6 +529,18 @@ void makeVariableListNode(struct vector *varlistVec) {
 void parserFinaliseBody(history *hs, node *bodyNode, struct vector *bodyVec,
                         size_t *varSize, node *largestAlignEligibleNode,
                         node *largestPossibleVarNode) {
+  if (hs->flags & HISTORY_FLAG_INSIDE_UNION) {
+    if (largestPossibleVarNode) {
+      *varSize = variableSize(largestPossibleVarNode);
+    }
+  }
+  int padding = computeSumPadding(bodyVec);
+  *varSize += padding;
+  if (largestAlignEligibleNode) {
+    *varSize = alignValue(*varSize, largestAlignEligibleNode->var.type.size);
+  }
+  bool padded = padding != 0;
+
   bodyNode->body.largestVarNode = largestAlignEligibleNode;
   bodyNode->body.padded = false;
   bodyNode->body.size = *varSize;
@@ -511,9 +548,51 @@ void parserFinaliseBody(history *hs, node *bodyNode, struct vector *bodyVec,
 }
 void parserScopeNew() { scopeNew(currentProcess, 0); }
 
+void parserScopeFinish(compileProcess *currentProcess) {
+  scopeFinish(currentProcess);
+}
+
+void parserScopePush(node *node, size_t size) {
+  scopePush(currentProcess, node, size);
+}
+
+void parserAppendSizeForNodeStructUnion(history *hs, size_t *varSize,
+                                        struct node *node) {
+  *varSize += variableSize(node);
+  if (node->var.type.flags & DATATYPE_FLAG_IS_POINTER) {
+    return;
+  }
+  struct node *largestVarNode =
+      variableStructOrUnionBodyNode(node)->body.largestVarNode;
+  if (largestVarNode) {
+    *varSize += alignValue(*varSize, largestVarNode->var.type.size);
+  }
+}
+void parserAppendSizeForNode(history *hs, size_t *varSize, node *node);
+void parserAppendSizeForVariableList(history *hs, size_t *varSize,
+                                     struct vector *vec) {
+  vector_set_peek_pointer(vec, 0);
+  node *node = vector_peek_ptr(vec);
+  while (node) {
+    parserAppendSizeForNode(hs, varSize, node);
+    node = vector_peek_ptr(vec);
+  }
+}
 void parserAppendSizeForNode(history *hs, size_t *varSize, node *node) {
   compilerWarning(currentProcess,
                   "Parsing size tracking is not yet supported\n");
+  if (!node) {
+    return;
+  }
+  if (node->type == NODE_TYPE_VARIABLE) {
+    if (nodeIsStructOrUnionVariable(node)) {
+      parserAppendSizeForNodeStructUnion(hs, varSize, node);
+      return;
+    }
+    *varSize += variableSize(node);
+  } else if (node->type == NODE_TYPE_VARIABLE_LIST) {
+    parserAppendSizeForVariableList(hs, varSize, node->varlist.list);
+  }
 }
 void parseBodySingleStatement(size_t *varSize, struct vector *bodyVec,
                               history *hs) {
