@@ -93,3 +93,19 @@ bool nodeIsStructOrUnionVariable(struct node *node) {
   }
   return dataTypeIsStructOrUnion(&node->var.type);
 }
+struct node *variableNode(struct node *node) {
+  struct node *varNode = NULL;
+  switch (node->type) {
+  case NODE_TYPE_VARIABLE:
+    varNode = node;
+    break;
+  case NODE_TYPE_STRUCT:
+    varNode = node->_struct.var;
+    break;
+  case NODE_TYPE_UNION:
+    printf("unions are not yet supported\n");
+    exit(-1);
+    break;
+  }
+  return varNode;
+}

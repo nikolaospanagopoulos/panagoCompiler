@@ -41,3 +41,6 @@ size_t datatypeSize(struct datatype *dtype) {
   }
   return dtype->size;
 }
+bool datatypeIsPrimitive(struct datatype *dtype) {
+  return !dataTypeIsStructOrUnion(dtype);
+}

@@ -38,7 +38,10 @@ struct parserScopeEntity *parserScopeEntityNew(node *node, int stackOffset,
   return entity;
 }
 
-enum { HISTORY_FLAG_INSIDE_UNION = 0b00000001 };
+enum {
+  HISTORY_FLAG_INSIDE_UNION = 0b00000001,
+  HISTORY_FLAG_IS_UPWARD_STACK = 0b00000010
+};
 
 typedef struct history {
   int flags;
@@ -473,11 +476,45 @@ struct arrayBrackets *parseArrayBrackets(struct history *hs) {
   }
   return brackets;
 }
+
+struct parserScopeEntity *parserScopeLastEntityStopAtGlobalScope() {
+  return scopeLastEntityStopAt(currentProcess, currentProcess->scope.root);
+}
+bool isPrimitive(struct node *node) {
+  if (node->type != NODE_TYPE_VARIABLE) {
+    compilerError(currentProcess, "Not a variable");
+  }
+  return datatypeIsPrimitive(&node->var.type);
+}
+void parserScopeOffsetForStack(node *varNode, history *hs) {
+  struct parserScopeEntity *lastEntity =
+      parserScopeLastEntityStopAtGlobalScope();
+  // for function arguments stack is upwards
+  bool upwardStack = hs->flags & HISTORY_FLAG_IS_UPWARD_STACK;
+  // minus because the stack grows downwards
+
+  int offset = -variableSize(varNode);
+  if (upwardStack) {
+#warning "HANDLE UPWARD STACK"
+    compilerError(currentProcess, "Not yet implemented upward stack \n");
+  }
+  if (lastEntity) {
+    offset += variableNode(lastEntity->node)->var.aoffset;
+    if (isPrimitive(varNode)) {
+      variableNode(varNode)->var.padding =
+          padding(upwardStack ? offset : -offset, varNode->var.type.size);
+    }
+  }
+}
+void parserScopeOffset(node *varNode, history *hs) {
+  parserScopeOffsetForStack(varNode, hs);
+}
 void makeVariableNodeAndRegister(history *hs, datatype *dtype, token *name,
                                  node *valueNode) {
   makeVariableNode(dtype, name, valueNode);
   node *varNode = nodePop();
   // cleanup
+  parserScopeOffset(varNode, hs);
   nodePush(varNode);
 }
 void parseVariable(datatype *dtype, token *namedToken, history *hs) {

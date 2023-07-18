@@ -86,6 +86,7 @@ typedef struct node {
       struct datatype type;
       int padding;
       const char *name;
+      int aoffset;
       struct node *val;
     } var;
     struct varlist {

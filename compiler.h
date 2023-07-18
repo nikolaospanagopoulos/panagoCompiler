@@ -179,3 +179,7 @@ bool nodeIsStructOrUnionVariable(struct node *node);
 size_t variableSize(struct node *varNode);
 node *variableStructOrUnionBodyNode(struct node *node);
 void scopePush(compileProcess *cp, void *ptr, size_t elemSize);
+void *scopeLastEntityStopAt(compileProcess *cp, scope *stopScope);
+struct node *variableNode(struct node *node);
+bool datatypeIsPrimitive(struct datatype *dtype);
+bool isPrimitive(struct node *node);
