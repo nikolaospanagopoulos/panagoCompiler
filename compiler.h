@@ -183,3 +183,4 @@ void *scopeLastEntityStopAt(compileProcess *cp, scope *stopScope);
 struct node *variableNode(struct node *node);
 bool datatypeIsPrimitive(struct datatype *dtype);
 bool isPrimitive(struct node *node);
+void *scopeLastEntity(compileProcess *cp);

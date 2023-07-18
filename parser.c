@@ -40,7 +40,9 @@ struct parserScopeEntity *parserScopeEntityNew(node *node, int stackOffset,
 
 enum {
   HISTORY_FLAG_INSIDE_UNION = 0b00000001,
-  HISTORY_FLAG_IS_UPWARD_STACK = 0b00000010
+  HISTORY_FLAG_IS_UPWARD_STACK = 0b00000010,
+  HISTORY_FLAG_IS_GLOBAL_SCOPE = 0b00000100,
+  HISTORY_FLAG_INSIDE_STRUCT = 0b00001000
 };
 
 typedef struct history {
@@ -486,6 +488,25 @@ bool isPrimitive(struct node *node) {
   }
   return datatypeIsPrimitive(&node->var.type);
 }
+int parserScopeOffserForGlobal(struct node *node, history *hs) {
+  // global vars have  offset
+  return 0;
+}
+struct parserScopeEntity *parserScopeLastEntity() {
+  return scopeLastEntity(currentProcess);
+}
+void parserScopeOffsetForStruct(node *node, history *hs) {
+  int offset = 0;
+  struct parserScopeEntity *lastEntity = parserScopeLastEntity();
+  if (lastEntity) {
+    offset += lastEntity->stackOffset + lastEntity->node->var.type.size;
+    if (isPrimitive(node)) {
+      node->var.padding = padding(offset, node->var.type.size);
+    }
+    node->var.aoffset = offset + node->var.padding;
+  }
+}
+
 void parserScopeOffsetForStack(node *varNode, history *hs) {
   struct parserScopeEntity *lastEntity =
       parserScopeLastEntityStopAtGlobalScope();
@@ -507,14 +528,26 @@ void parserScopeOffsetForStack(node *varNode, history *hs) {
   }
 }
 void parserScopeOffset(node *varNode, history *hs) {
+  if (hs->flags & HISTORY_FLAG_IS_GLOBAL_SCOPE) {
+    parserScopeOffserForGlobal(varNode, hs);
+    return;
+  }
+  if (hs->flags & HISTORY_FLAG_INSIDE_STRUCT) {
+    parserScopeOffsetForStruct(varNode, hs);
+    return;
+  }
   parserScopeOffsetForStack(varNode, hs);
 }
+void parserScopePush(struct parserScopeEntity *entity, size_t size);
 void makeVariableNodeAndRegister(history *hs, datatype *dtype, token *name,
                                  node *valueNode) {
   makeVariableNode(dtype, name, valueNode);
   node *varNode = nodePop();
   // cleanup
   parserScopeOffset(varNode, hs);
+  parserScopePush(parserScopeEntityNew(varNode, varNode->var.aoffset, 0),
+                  varNode->var.type.size);
+
   nodePush(varNode);
 }
 void parseVariable(datatype *dtype, token *namedToken, history *hs) {
@@ -589,8 +622,8 @@ void parserScopeFinish(compileProcess *currentProcess) {
   scopeFinish(currentProcess);
 }
 
-void parserScopePush(node *node, size_t size) {
-  scopePush(currentProcess, node, size);
+void parserScopePush(struct parserScopeEntity *entity, size_t size) {
+  scopePush(currentProcess, entity, size);
 }
 
 void parserAppendSizeForNodeStructUnion(history *hs, size_t *varSize,
