@@ -5,9 +5,11 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-scope *scopeAlloc() {
+scope *scopeAlloc(compileProcess *cp) {
   scope *scope = calloc(1, sizeof(struct scope));
   scope->entities = vector_create(sizeof(void *));
+  vector_push(cp->gb, &scope);
+  vector_push(cp->gbForVectors, &scope->entities);
   vector_set_peek_pointer_end(scope->entities);
   vector_set_flag(scope->entities, VECTOR_FLAG_PEEK_DECREMENT);
   return scope;
@@ -17,19 +19,16 @@ scope *createRootScope(compileProcess *cp) {
   if (cp->scope.root || cp->scope.current) {
     return NULL;
   }
-  scope *rootScope = scopeAlloc();
+  scope *rootScope = scopeAlloc(cp);
   cp->scope.root = rootScope;
   cp->scope.current = rootScope;
   return rootScope;
 }
 void scopeDealloc(scope *scope) {
   if (scope) {
-    vector_free(scope->entities);
-    free(scope);
   }
 }
 void scopeFreeRoot(compileProcess *cp) {
-  scopeDealloc(cp->scope.root);
   cp->scope.root = NULL;
   cp->scope.current = NULL;
 }
@@ -37,7 +36,7 @@ scope *scopeNew(compileProcess *process, int flags) {
   if (!process->scope.root || !process->scope.current) {
     return NULL;
   }
-  scope *newScope = scopeAlloc();
+  scope *newScope = scopeAlloc(process);
   newScope->flags = flags;
   newScope->parent = process->scope.current;
   process->scope.current = newScope;

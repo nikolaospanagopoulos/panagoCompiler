@@ -109,3 +109,10 @@ struct node *variableNode(struct node *node) {
   }
   return varNode;
 }
+
+node *variableNodeOrList(struct node *node) {
+  if (node->type == NODE_TYPE_VARIABLE_LIST) {
+    return node;
+  }
+  return variableNode(node);
+}

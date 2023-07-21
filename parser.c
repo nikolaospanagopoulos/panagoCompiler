@@ -576,8 +576,16 @@ static void expectSym(char c) {
                   "Expected symbol %c but something else was provided \n", c);
   }
 }
+
+void parseBody(size_t *variableSize, history *hs);
 void parseSymbol() {
-  compilerError(currentProcess, "Symbols are not yet supported\n");
+  if (tokenNextIsSymbol('{')) {
+    size_t variableSize = 0;
+    history *hs = historyBegin(HISTORY_FLAG_IS_GLOBAL_SCOPE);
+    parseBody(&variableSize, hs);
+    struct node *bodyNode = nodePop();
+    nodePush(bodyNode);
+  }
 }
 void parseStatement(history *hs) {
   if (tokenPeekNext()->type == KEYWORD) {
@@ -626,6 +634,16 @@ void parserScopePush(struct parserScopeEntity *entity, size_t size) {
   scopePush(currentProcess, entity, size);
 }
 
+node *variableStructOrUnionBodyNode(struct node *node) {
+  if (!nodeIsStructOrUnionVariable(node)) {
+    return NULL;
+  }
+  if (node->var.type.type == DATA_TYPE_STRUCT) {
+    return node->var.type.structNode->_struct.body_n;
+  }
+  compilerWarning(currentProcess, "Union body not implemented yet \n");
+  exit(1);
+}
 void parserAppendSizeForNodeStructUnion(history *hs, size_t *varSize,
                                         struct node *node) {
   *varSize += variableSize(node);
@@ -664,6 +682,7 @@ void parserAppendSizeForNode(history *hs, size_t *varSize, node *node) {
     parserAppendSizeForVariableList(hs, varSize, node->varlist.list);
   }
 }
+
 void parseBodySingleStatement(size_t *varSize, struct vector *bodyVec,
                               history *hs) {
   makeBodyNode(bodyVec, 0, false, NULL);
@@ -684,6 +703,49 @@ void parseBodySingleStatement(size_t *varSize, struct vector *bodyVec,
   parserCurrentBody = bodyNode->binded.owner;
   nodePush(bodyNode);
 }
+
+void parseBodyMultipleStatements(size_t *varSize, struct vector *bodyVec,
+                                 history *hs) {
+  // make body node
+  makeBodyNode(NULL, 0, false, NULL);
+  struct node *bodyNode = nodePop();
+  bodyNode->binded.owner = parserCurrentBody;
+  parserCurrentBody = bodyNode;
+
+  struct node *stmtNode = NULL;
+  struct node *largestPossibleVarNode = NULL;
+  struct node *largestAlignEligibleNode = NULL;
+
+  expectSym('{');
+
+  printf("nikos");
+  while (!tokenNextIsSymbol('}')) {
+    parseStatement(historyDown(hs, hs->flags));
+    stmtNode = nodePop();
+    if (stmtNode->type == NODE_TYPE_VARIABLE) {
+      if (!largestPossibleVarNode ||
+          (largestPossibleVarNode->var.type.size <= stmtNode->var.type.size)) {
+        largestPossibleVarNode = stmtNode;
+      }
+      if (isPrimitive(stmtNode)) {
+        if (!largestAlignEligibleNode ||
+            (largestAlignEligibleNode->var.type.size <=
+             stmtNode->var.type.size)) {
+          largestAlignEligibleNode = stmtNode;
+        }
+      }
+    }
+
+    vector_push(bodyVec, &stmtNode);
+    parserAppendSizeForNode(hs, varSize, variableNodeOrList(stmtNode));
+  }
+
+  expectSym('}');
+  parserFinaliseBody(hs, bodyNode, bodyVec, varSize, largestAlignEligibleNode,
+                     largestPossibleVarNode);
+  parserCurrentBody = bodyNode->binded.owner;
+  nodePush(bodyNode);
+}
 void parseBody(size_t *variableSize, history *hs) {
   parserScopeNew();
   size_t tmpSize = 0x00;
@@ -691,11 +753,13 @@ void parseBody(size_t *variableSize, history *hs) {
     variableSize = &tmpSize;
   }
   struct vector *bodyVec = vector_create(sizeof(struct node *));
+  vector_push(currentProcess->gbForVectors, &bodyVec);
   if (!tokenNextIsSymbol('{')) {
     parseBodySingleStatement(variableSize, bodyVec, hs);
     parserScopeFinish(currentProcess);
     return;
   }
+  parseBodyMultipleStatements(variableSize, bodyVec, hs);
   parserScopeFinish(currentProcess);
 }
 
@@ -828,6 +892,10 @@ int parseNext() {
     parseKeywordForGlobal();
     res = 0;
     break;
+  case SYMBOL:
+    parseSymbol();
+    res = 0;
+    break;
   }
   return res;
 }
@@ -839,7 +907,6 @@ int parse(compileProcess *process) {
   parserLastToken = NULL;
   nodeSetVector(process->nodeVec, process->nodeTreeVec,
                 process->nodeGarbageVec);
-
   struct node *node = NULL;
 
   vector_set_peek_pointer(process->tokenVec, 0);

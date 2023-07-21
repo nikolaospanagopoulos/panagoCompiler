@@ -184,3 +184,4 @@ struct node *variableNode(struct node *node);
 bool datatypeIsPrimitive(struct datatype *dtype);
 bool isPrimitive(struct node *node);
 void *scopeLastEntity(compileProcess *cp);
+node *variableNodeOrList(struct node *node);

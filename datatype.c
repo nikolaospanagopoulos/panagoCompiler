@@ -7,7 +7,7 @@ bool datatypeIsStructOrUnionForName(const char *name) {
 }
 
 bool dataTypeIsStructOrUnion(struct datatype *dtype) {
-  return dtype->type == DATA_TYPE_STRUCT || DATA_TYPE_UNION;
+  return dtype->type == DATA_TYPE_STRUCT || dtype->type == DATA_TYPE_UNION;
 }
 
 size_t datatypeElementSize(struct datatype *dtype) {

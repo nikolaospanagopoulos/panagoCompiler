@@ -32,6 +32,7 @@ typedef struct compileProcess {
   struct vector *nodeTreeVec;
   struct vector *nodeGarbageVec;
   struct vector *gb;
+  struct vector *gbForVectors;
   struct {
     scope *root;
     scope *current;
