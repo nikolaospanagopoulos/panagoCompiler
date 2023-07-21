@@ -1,4 +1,5 @@
 #include "node.h"
+#include "compileProcess.h"
 #include "compiler.h"
 #include "vector.h"
 #include <assert.h>
@@ -115,4 +116,38 @@ node *variableNodeOrList(struct node *node) {
     return node;
   }
   return variableNode(node);
+}
+
+void makeStructNode(const char *name, struct node *bodyNode) {
+  int flags = 0;
+  if (!bodyNode) {
+    flags |= NODE_FLAG_IS_FORWARD_DECLERATION;
+  }
+  nodeCreate(&(struct node){.type = NODE_TYPE_STRUCT,
+                            ._struct.body_n = bodyNode,
+                            ._struct.name = name,
+                            .flags = flags});
+}
+struct node *nodeFromSym(struct symbol *sym) {
+  if (sym->type != SYMBOL_TYPE_NODE) {
+    return NULL;
+  }
+  return sym->data;
+}
+struct node *nodeFromSymbol(compileProcess *process, const char *name) {
+  struct symbol *sym = symresolverGetSymbol(process, name);
+  if (!sym) {
+    return NULL;
+  }
+  return nodeFromSym(sym);
+}
+struct node *structNodeForName(compileProcess *process, const char *name) {
+  struct node *node = nodeFromSymbol(process, name);
+  if (!node) {
+    return NULL;
+  }
+  if (node->type != NODE_TYPE_STRUCT) {
+    return NULL;
+  }
+  return node;
 }

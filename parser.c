@@ -373,6 +373,20 @@ void parserDatatypeInitSizeAndTypeForPrimitive(struct token *datatypeToken,
   }
   parserDatatypeAdjustSizeForSecondary(datatypeOut, datatypeSecToken);
 }
+size_t sizeOfStruct(const char *structName) {
+  struct symbol *sym = symresolverGetSymbol(currentProcess, structName);
+  if (!sym) {
+    return 0;
+  }
+  if (sym->type != SYMBOL_TYPE_NODE) {
+    compilerError(currentProcess, "Symbol is not a node \n");
+  }
+  struct node *node = sym->data;
+  if (node->type != NODE_TYPE_STRUCT) {
+    compilerError(currentProcess, "node is not a struct \n");
+  }
+  return node->_struct.body_n->body.size;
+}
 void parserInitDatatypeTypeAndSize(token *datatypeToken,
                                    token *datatypeSecToken, datatype *typeOut,
                                    int ptrDepth, int expectedType) {
@@ -386,8 +400,13 @@ void parserInitDatatypeTypeAndSize(token *datatypeToken,
                                               typeOut);
     break;
   case DATA_TYPE_EXPECT_STRUCT:
+    typeOut->type = DATA_TYPE_STRUCT;
+    typeOut->size = sizeOfStruct(datatypeToken->sval);
+    typeOut->structNode =
+        structNodeForName(currentProcess, datatypeToken->sval);
+    break;
   case DATA_TYPE_EXPECT_UNION:
-    compilerError(currentProcess, "Cannot use struct or unions yet \n");
+    compilerError(currentProcess, "Cannot use unions yet \n");
     break;
   default:
     compilerError(currentProcess, "Unsupported datatype expectation \n");
@@ -667,8 +686,6 @@ void parserAppendSizeForVariableList(history *hs, size_t *varSize,
   }
 }
 void parserAppendSizeForNode(history *hs, size_t *varSize, node *node) {
-  compilerWarning(currentProcess,
-                  "Parsing size tracking is not yet supported\n");
   if (!node) {
     return;
   }
@@ -763,20 +780,47 @@ void parseBody(size_t *variableSize, history *hs) {
   parserScopeFinish(currentProcess);
 }
 
-void parseStructNoNewScope(datatype *type) {}
+void parseStructNoNewScope(datatype *type, bool isForwardDecleration) {
+  struct node *bodyNode = NULL;
+  size_t bodyVarSize = 0;
+  if (!isForwardDecleration) {
+    parseBody(&bodyVarSize, historyBegin(HISTORY_FLAG_INSIDE_STRUCT));
+    bodyNode = nodePop();
+  }
+  makeStructNode(type->typeStr, bodyNode);
+  struct node *structNode = nodePop();
+  if (bodyNode) {
+    type->size = bodyNode->body.size;
+  }
+  type->structNode = structNode;
+  if (tokenPeekNext()->type == IDENTIFIER) {
+    token *varName = tokenNext();
+    structNode->flags |= NODE_FLAG_HAS_VARIABLE_COMBINED;
+    if (type->flags & DATATYPE_FLAG_STRUCT_UNION_NO_NAME) {
+      type->typeStr = varName->sval;
+      type->flags &= ~DATATYPE_FLAG_STRUCT_UNION_NO_NAME;
+      structNode->_struct.name = varName->sval;
+    }
+
+    makeVariableNodeAndRegister(historyBegin(0), type, varName, NULL);
+    structNode->_struct.var = nodePop();
+  }
+  expectSym(';');
+  nodePush(structNode);
+}
 void parseStruct(struct datatype *dtype) {
   bool isForwardDecleration = !tokenIsSymbol(tokenPeekNext(), '{');
   if (!isForwardDecleration) {
     parserScopeNew();
   }
-  parseStructNoNewScope(dtype);
+  parseStructNoNewScope(dtype, isForwardDecleration);
   if (!isForwardDecleration) {
     parserScopeFinish(currentProcess);
   }
 }
 void parseStructOrUnion(struct datatype *dtype) {
   switch (dtype->type) {
-  case DATA_TYPE_EXPECT_STRUCT:
+  case DATA_TYPE_STRUCT:
     parseStruct(dtype);
     break;
   case DATA_TYPE_UNION:
@@ -791,6 +835,11 @@ void parseVariableFunctionStructUnion(struct history *hs) {
   parseDatatype(&dtype);
 
   if (dataTypeIsStructOrUnion(&dtype) && tokenNextIsSymbol('{')) {
+    parseStructOrUnion(&dtype);
+    struct node *suNode = nodePop();
+    symresolverBuildForNode(currentProcess, suNode);
+    nodePush(suNode);
+    return;
   }
 
   parserIgnoreInt(&dtype);

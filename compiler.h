@@ -56,7 +56,11 @@ struct lexProcessFunctions {
 
 enum { LEX_ALL_OK, LEX_ERROR };
 
-enum { INSIDE_EXPRESSION = 0b00000001 };
+enum {
+  INSIDE_EXPRESSION = 0b00000001,
+  NODE_FLAG_IS_FORWARD_DECLERATION = 0b00000010,
+  NODE_FLAG_HAS_VARIABLE_COMBINED = 0b00000100
+};
 
 typedef struct lexProcess {
   pos pos;
@@ -185,3 +189,11 @@ bool datatypeIsPrimitive(struct datatype *dtype);
 bool isPrimitive(struct node *node);
 void *scopeLastEntity(compileProcess *cp);
 node *variableNodeOrList(struct node *node);
+void makeStructNode(const char *name, struct node *bodyNode);
+void symresolverBuildForNode(compileProcess *process, node *node);
+symbol *symresolverGetSymbol(compileProcess *process, const char *name);
+struct node *structNodeForName(compileProcess *process, const char *name);
+void symResolverInitialize(struct compileProcess *process);
+
+void symresolverNewTable(compileProcess *process);
+void symresolverEndTable(compileProcess *process);

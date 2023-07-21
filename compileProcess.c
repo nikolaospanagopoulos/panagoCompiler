@@ -105,5 +105,7 @@ compileProcess *compileProcessCreate(const char *filename,
   process->nodeGarbageVec = vector_create(sizeof(struct node *));
   process->gb = vector_create(sizeof(void *));
   process->gbForVectors = vector_create(sizeof(struct vector *));
+  symResolverInitialize(process);
+  symresolverNewTable(process);
   return process;
 }
