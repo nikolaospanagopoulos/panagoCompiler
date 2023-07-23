@@ -108,7 +108,7 @@ node *nodeCreate(node *_node);
 node *nodePop();
 node *nodePeek();
 void nodeSetVector(struct vector *vec, struct vector *rootVec,
-                   struct vector *garbageVec);
+                   struct vector *garbageVec, struct vector *garbageForVec);
 
 void nodePush(node *node);
 
@@ -201,3 +201,7 @@ void symResolverInitialize(struct compileProcess *process);
 void symresolverNewTable(compileProcess *process);
 void symresolverEndTable(compileProcess *process);
 bool tokenIsIdentifier(token *token);
+void makeFunctionNode(struct datatype *retType, const char *name,
+                      struct vector *arguments, struct node *bodyNode);
+symbol *symresolverGetSymbolForNativeFunction(compileProcess *process,
+                                              const char *name);

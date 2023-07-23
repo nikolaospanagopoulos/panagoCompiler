@@ -14,7 +14,7 @@ static token *parserLastToken;
 extern struct node *parserCurrentBody;
 extern struct expressionableOpPrecedenceGroup
     opPrecedence[TOTAL_OPERATOR_GROUPS];
-
+extern struct node *parserCurrentFunction;
 enum {
   PARSER_SCOPE_ENTITY_ON_STACK = 0b00000001,
   PARSER_SCOPE_ENTITY_STRUCTURE_SCOPE = 0b00000011
@@ -27,6 +27,7 @@ struct parserScopeEntity {
   node *node;
 };
 
+void parserScopeNew();
 struct parserScopeEntity *parserScopeEntityNew(node *node, int stackOffset,
                                                int flags) {
   struct parserScopeEntity *entity =
@@ -42,7 +43,8 @@ enum {
   HISTORY_FLAG_INSIDE_UNION = 0b00000001,
   HISTORY_FLAG_IS_UPWARD_STACK = 0b00000010,
   HISTORY_FLAG_IS_GLOBAL_SCOPE = 0b00000100,
-  HISTORY_FLAG_INSIDE_STRUCT = 0b00001000
+  HISTORY_FLAG_INSIDE_STRUCT = 0b00001000,
+  HISTORY_FLAG_INSIDE_FUNCTION_BODY = 0b00010000
 };
 
 typedef struct history {
@@ -595,6 +597,40 @@ static void expectSym(char c) {
 }
 
 void parseBody(size_t *variableSize, history *hs);
+void parseFuctionBody(history *hs) {
+  parseBody(NULL,
+            historyDown(hs, hs->flags | HISTORY_FLAG_INSIDE_FUNCTION_BODY));
+}
+void parseFunction(struct datatype *retType, struct token *nameToken,
+                   history *hs) {
+  struct vector *argumentsVector = NULL;
+  parserScopeNew();
+  makeFunctionNode(retType, nameToken->sval, NULL, NULL);
+
+  struct node *functionNode = nodePeek();
+
+  parserCurrentFunction = functionNode;
+  if (dataTypeIsStructOrUnion(retType)) {
+    functionNode->func.args.stackAddition += DATA_SIZE_DWORD;
+  }
+  expectOp("(");
+  expectSym(')');
+
+  functionNode->func.args.vector = argumentsVector;
+  if (symresolverGetSymbolForNativeFunction(currentProcess, nameToken->sval)) {
+    functionNode->func.flags |= FUNCTION_NODE_FLAG_IS_NATIVE;
+  }
+  if (tokenNextIsSymbol('{')) {
+    parseFuctionBody(historyBegin(0));
+    struct node *bodyNode = nodePop();
+    functionNode->func.bodyN = bodyNode;
+  } else {
+    expectSym(';');
+  }
+
+  parserCurrentFunction = NULL;
+  parserScopeFinish(currentProcess);
+}
 void parseSymbol() {
   if (tokenNextIsSymbol('{')) {
     size_t variableSize = 0;
@@ -845,6 +881,10 @@ void parseVariableFunctionStructUnion(struct history *hs) {
     compilerError(currentProcess,
                   "Expecting a valid name after variable decleration\n");
   }
+  if (tokenNextIsOperator("(")) {
+    parseFunction(&dtype, namedToken, hs);
+    return;
+  }
   parseVariable(&dtype, namedToken, hs);
   if (tokenIsOperator(tokenPeekNext(), ",")) {
     struct vector *varList = vector_create(sizeof(struct node *));
@@ -951,8 +991,8 @@ int parse(compileProcess *process) {
   createRootScope(process);
   currentProcess = process;
   parserLastToken = NULL;
-  nodeSetVector(process->nodeVec, process->nodeTreeVec,
-                process->nodeGarbageVec);
+  nodeSetVector(process->nodeVec, process->nodeTreeVec, process->nodeGarbageVec,
+                process->gbForVectors);
   struct node *node = NULL;
 
   vector_set_peek_pointer(process->tokenVec, 0);

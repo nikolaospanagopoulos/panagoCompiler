@@ -1,4 +1,2 @@
-struct name {
-  int x;
-  int y;
+int main(){
 }

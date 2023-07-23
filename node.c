@@ -12,13 +12,16 @@
 struct vector *nodeVector = NULL;
 struct vector *nodeVectorRoot = NULL;
 struct vector *garbage = NULL;
+struct vector *garbageForVector = NULL;
 struct node *parserCurrentBody = NULL;
+struct node *parserCurrentFunction = NULL;
 
 void nodeSetVector(struct vector *vec, struct vector *rootVec,
-                   struct vector *garbageVec) {
+                   struct vector *garbageVec, struct vector *garbageForVec) {
   nodeVector = vec;
   nodeVectorRoot = rootVec;
   garbage = garbageVec;
+  garbageForVector = garbageForVec;
 }
 
 void nodePush(node *node) { vector_push(nodeVector, &node); }
@@ -50,6 +53,8 @@ bool nodeIsExpressionable(node *node) {
 node *nodeCreate(node *_node) {
   node *node = malloc(sizeof(struct node));
   memcpy(node, _node, sizeof(struct node));
+  node->binded.owner = parserCurrentBody;
+  node->binded.function = parserCurrentFunction;
   garpush(node);
   nodePush(node);
 
@@ -150,4 +155,17 @@ struct node *structNodeForName(compileProcess *process, const char *name) {
     return NULL;
   }
   return node;
+}
+
+void makeFunctionNode(struct datatype *retType, const char *name,
+                      struct vector *arguments, struct node *bodyNode) {
+  nodeCreate(&(struct node){.type = NODE_TYPE_FUNCTION,
+                            .func.name = name,
+                            .func.args.vector = arguments,
+                            .func.bodyN = bodyNode,
+                            .func.rtype = *retType,
+                            .func.args.stackAddition = DATA_SIZE_DDWORD});
+  if (arguments) {
+    vector_push(garbageForVector, &arguments);
+  }
 }
