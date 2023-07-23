@@ -147,6 +147,9 @@ enum {
   DATA_SIZE_DWORD = 4,
   DATA_SIZE_DDWORD = 8
 };
+
+enum { FUNCTION_NODE_FLAG_IS_NATIVE = 0b00000001 };
+
 int arrayTotalIndexes(struct datatype *dtype);
 size_t arrayBracketsCalcSize(struct datatype *dtype,
                              struct arrayBrackets *brackets);

@@ -106,6 +106,21 @@ typedef struct node {
       bool padded;
       struct node *largestVarNode;
     } body;
+    struct function {
+      int flags;
+      // return data type
+      struct datatype rtype;
+      // function name
+      const char *name;
+      struct functionArguments {
+        struct vector *vector;
+        // how much to add to base ptr to get first argument
+        size_t stackAddition;
+      } args;
+      struct node *bodyN;
+      // stack size for all vars inside function
+      size_t stackSize;
+    } func;
   };
 
   union {
