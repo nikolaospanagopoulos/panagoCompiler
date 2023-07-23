@@ -29,3 +29,6 @@ bool tokenIsPrimitiveKeyword(token *token) {
 bool tokenIsOperator(token *token, const char *val) {
   return token && token->type == OPERATOR && S_EQ(token->sval, val);
 }
+bool tokenIsIdentifier(token *token) {
+  return token && token->type == IDENTIFIER;
+}

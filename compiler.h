@@ -197,3 +197,4 @@ void symResolverInitialize(struct compileProcess *process);
 
 void symresolverNewTable(compileProcess *process);
 void symresolverEndTable(compileProcess *process);
+bool tokenIsIdentifier(token *token);

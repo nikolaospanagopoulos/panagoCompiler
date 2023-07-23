@@ -85,14 +85,12 @@ static void parserIgnoreNlOrComment(token *token) {
 static token *tokenNext() {
   token *nextToken = vector_peek_no_increment(currentProcess->tokenVec);
   // maybe needs to change
-  if (!nextToken) {
-    return NULL;
-  }
   parserIgnoreNlOrComment(nextToken);
-  currentProcess->position = nextToken->position;
+  if (nextToken) {
+    currentProcess->position = nextToken->position;
+  }
   parserLastToken = nextToken;
-  token *toReturn = vector_peek(currentProcess->tokenVec);
-  return toReturn;
+  return vector_peek(currentProcess->tokenVec);
 }
 static token *tokenPeekNext() {
   token *nextToken = vector_peek_no_increment(currentProcess->tokenVec);
@@ -735,7 +733,6 @@ void parseBodyMultipleStatements(size_t *varSize, struct vector *bodyVec,
 
   expectSym('{');
 
-  printf("nikos");
   while (!tokenNextIsSymbol('}')) {
     parseStatement(historyDown(hs, hs->flags));
     stmtNode = nodePop();
@@ -793,7 +790,7 @@ void parseStructNoNewScope(datatype *type, bool isForwardDecleration) {
     type->size = bodyNode->body.size;
   }
   type->structNode = structNode;
-  if (tokenPeekNext()->type == IDENTIFIER) {
+  if (tokenIsIdentifier(tokenPeekNext())) {
     token *varName = tokenNext();
     structNode->flags |= NODE_FLAG_HAS_VARIABLE_COMBINED;
     if (type->flags & DATATYPE_FLAG_STRUCT_UNION_NO_NAME) {
