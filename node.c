@@ -157,6 +157,10 @@ struct node *structNodeForName(compileProcess *process, const char *name) {
   return node;
 }
 
+void makeExpParenthesisNode(struct node *expNode) {
+  nodeCreate(
+      &(struct node){.type = NODE_TYPE_EXPRESSION, .parenthesis.exp = expNode});
+}
 void makeFunctionNode(struct datatype *retType, const char *name,
                       struct vector *arguments, struct node *bodyNode) {
   nodeCreate(&(struct node){.type = NODE_TYPE_FUNCTION,
@@ -168,4 +172,14 @@ void makeFunctionNode(struct datatype *retType, const char *name,
   if (arguments) {
     vector_push(garbageForVector, &arguments);
   }
+}
+bool nodeIsExpressionOrParentheses(struct node *node) {
+  return node->type == NODE_TYPE_EXPRESSION_PARENTHESES ||
+         node->type == NODE_TYPE_EXPRESSION;
+}
+bool nodeIsValueType(struct node *node) {
+  return nodeIsExpressionOrParentheses(node) ||
+         node->type == NODE_TYPE_IDENTIFIER || node->type == NODE_TYPE_NUMBER ||
+         node->type == NODE_TYPE_UNARY || node->type == NODE_TYPE_TENARY ||
+         node->type == NODE_TYPE_STRING;
 }

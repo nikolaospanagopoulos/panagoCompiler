@@ -15,6 +15,7 @@ extern struct node *parserCurrentBody;
 extern struct expressionableOpPrecedenceGroup
     opPrecedence[TOTAL_OPERATOR_GROUPS];
 extern struct node *parserCurrentFunction;
+struct node *parserBlancNode;
 enum {
   PARSER_SCOPE_ENTITY_ON_STACK = 0b00000001,
   PARSER_SCOPE_ENTITY_STRUCTURE_SCOPE = 0b00000011
@@ -27,6 +28,8 @@ struct parserScopeEntity {
   node *node;
 };
 
+static void expectSym(char c);
+static void expectOp(const char *op);
 void parserScopeNew();
 struct parserScopeEntity *parserScopeEntityNew(node *node, int stackOffset,
                                                int flags) {
@@ -51,6 +54,7 @@ typedef struct history {
   int flags;
 } history;
 
+void parseExpressionableRoot(history *hs);
 int parseKeyword(struct history *hs);
 history *historyBegin(int flags) {
   history *history = calloc(1, sizeof(struct history));
@@ -222,9 +226,40 @@ int parseExpressionNormal(history *hs) {
 void parseExpressionableForOp(history *hs, const char *op) {
   parseExpressionable(hs);
 }
+void parserDealWithAdditionalExpression() {
+  if (tokenPeekNext()->type == OPERATOR) {
+    parseExpressionable(historyBegin(0));
+  }
+}
+void parseForParentheses(history *hs) {
+  expectOp("(");
+  struct node *leftNode = NULL;
+  struct node *tmpNode = nodePeekOrNull();
+  if (tmpNode && nodeIsValueType(tmpNode)) {
+    leftNode = tmpNode;
+    nodePop();
+  }
+  struct node *expNode = parserBlancNode;
+  if (!tokenNextIsSymbol(')')) {
+    parseExpressionableRoot(historyBegin(0));
+    expNode = nodePop();
+  }
+  expectSym(')');
+  makeExpParenthesisNode(expNode);
+  if (leftNode) {
+    struct node *parenthesisNode = nodePop();
+    makeExpNode(leftNode, parenthesisNode, "()");
+  }
+  parserDealWithAdditionalExpression();
+}
 int parseExp(history *hs) {
-  int res = parseExpressionNormal(hs);
-  return res;
+  if (S_EQ(tokenPeekNext()->sval, "(")) {
+    parseForParentheses(hs);
+    return 0;
+  } else {
+    int res = parseExpressionNormal(hs);
+    return res;
+  }
 }
 void parseIdentifier(history *hs) {
   if (tokenPeekNext()->type != IDENTIFIER) {
@@ -526,6 +561,12 @@ void parserScopeOffsetForStruct(node *node, history *hs) {
   }
 }
 
+size_t functionNodeArgumentStackAddition(struct node *node) {
+  if (node->type != NODE_TYPE_FUNCTION) {
+    compilerError(currentProcess, "Not a function \n");
+  }
+  return node->func.args.stackAddition;
+}
 void parserScopeOffsetForStack(node *varNode, history *hs) {
   struct parserScopeEntity *lastEntity =
       parserScopeLastEntityStopAtGlobalScope();
@@ -535,8 +576,12 @@ void parserScopeOffsetForStack(node *varNode, history *hs) {
 
   int offset = -variableSize(varNode);
   if (upwardStack) {
-#warning "HANDLE UPWARD STACK"
-    compilerError(currentProcess, "Not yet implemented upward stack \n");
+    size_t stackAddition =
+        functionNodeArgumentStackAddition(parserCurrentFunction);
+    offset = stackAddition;
+    if (lastEntity) {
+      offset = datatypeSize(&variableNode(lastEntity->node)->var.type);
+    }
   }
   if (lastEntity) {
     offset += variableNode(lastEntity->node)->var.aoffset;
@@ -601,6 +646,7 @@ void parseFuctionBody(history *hs) {
   parseBody(NULL,
             historyDown(hs, hs->flags | HISTORY_FLAG_INSIDE_FUNCTION_BODY));
 }
+struct vector *parseFunctionArguments(history *hs);
 void parseFunction(struct datatype *retType, struct token *nameToken,
                    history *hs) {
   struct vector *argumentsVector = NULL;
@@ -614,6 +660,7 @@ void parseFunction(struct datatype *retType, struct token *nameToken,
     functionNode->func.args.stackAddition += DATA_SIZE_DWORD;
   }
   expectOp("(");
+  argumentsVector = parseFunctionArguments(historyBegin(0));
   expectSym(')');
 
   functionNode->func.args.vector = argumentsVector;
@@ -863,6 +910,42 @@ void parseStructOrUnion(struct datatype *dtype) {
                   "The provided data type is not a struct or a union\n");
   }
 }
+void tokenReadDots(size_t amount) {
+  for (size_t i = 0; i < amount; i++) {
+    expectOp(".");
+  }
+}
+void parseVariableFull(history *hs) {
+  struct datatype dtype;
+  parseDatatype(&dtype);
+  struct token *namedToken = NULL;
+  if (tokenPeekNext()->type == IDENTIFIER) {
+    namedToken = tokenNext();
+  }
+  parseVariable(&dtype, namedToken, hs);
+}
+struct vector *parseFunctionArguments(history *hs) {
+  parserScopeNew();
+  struct vector *argumentsVector = vector_create(sizeof(struct node *));
+  vector_push(currentProcess->gbForVectors, &argumentsVector);
+  while (!tokenNextIsSymbol(')')) {
+    if (tokenNextIsOperator(".")) {
+      tokenReadDots(3);
+      parserScopeFinish(currentProcess);
+      return argumentsVector;
+    }
+    parseVariableFull(
+        historyDown(hs, hs->flags | HISTORY_FLAG_IS_UPWARD_STACK));
+    struct node *argumentNode = nodePop();
+    vector_push(argumentsVector, &argumentNode);
+    if (!tokenNextIsOperator(",")) {
+      break;
+    }
+    tokenNext();
+  }
+  parserScopeFinish(currentProcess);
+  return argumentsVector;
+}
 void parseVariableFunctionStructUnion(struct history *hs) {
   datatype dtype;
   parseDatatype(&dtype);
@@ -939,6 +1022,7 @@ int parseExpressionableSingle(history *hs) {
     break;
   case IDENTIFIER:
     parseIdentifier(hs);
+    res = 0;
     break;
   case OPERATOR:
     res = parseExp(hs);
@@ -993,6 +1077,7 @@ int parse(compileProcess *process) {
   parserLastToken = NULL;
   nodeSetVector(process->nodeVec, process->nodeTreeVec, process->nodeGarbageVec,
                 process->gbForVectors);
+  parserBlancNode = nodeCreate(&(struct node){.type = NODE_TYPE_BLANK});
   struct node *node = NULL;
 
   vector_set_peek_pointer(process->tokenVec, 0);

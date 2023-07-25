@@ -82,6 +82,9 @@ typedef struct node {
       struct node *right;
       const char *op;
     } exp;
+    struct parenthesis {
+      struct node *exp;
+    } parenthesis;
     struct var {
       struct datatype type;
       int padding;

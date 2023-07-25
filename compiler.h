@@ -205,3 +205,6 @@ void makeFunctionNode(struct datatype *retType, const char *name,
                       struct vector *arguments, struct node *bodyNode);
 symbol *symresolverGetSymbolForNativeFunction(compileProcess *process,
                                               const char *name);
+bool nodeIsExpressionOrParentheses(struct node *node);
+bool nodeIsValueType(struct node *node);
+void makeExpParenthesisNode(struct node *expNode);
