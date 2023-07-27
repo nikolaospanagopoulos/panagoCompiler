@@ -1048,6 +1048,16 @@ void parseKeywordParenthesisExpression(const char *keyword) {
   parseExpressionableRoot(historyBegin(0));
   expectSym(')');
 }
+void parseDoWhile(history *hs) {
+  expectKeyword("do");
+  size_t varSize = 0;
+  parseBody(&varSize, hs);
+  struct node *bodyNode = nodePop();
+  parseKeywordParenthesisExpression("while");
+  struct node *expNode = nodePop();
+  expectSym(';');
+  makeDoWhileNode(bodyNode, expNode);
+}
 void parseWhile(history *hs) {
   parseKeywordParenthesisExpression("while");
   struct node *expNode = nodePop();
@@ -1129,6 +1139,10 @@ int parseKeyword(struct history *hs) {
   }
   if (S_EQ(token->sval, "while")) {
     parseWhile(hs);
+    return 0;
+  }
+  if (S_EQ(token->sval, "do")) {
+    parseDoWhile(hs);
     return 0;
   }
 

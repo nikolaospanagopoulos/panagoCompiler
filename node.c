@@ -211,3 +211,8 @@ void makeWhileNode(struct node *expNode, struct node *bodyNode) {
                             .stmt.whileStmt.expNode = expNode,
                             .stmt.whileStmt.bodyNode = bodyNode});
 }
+void makeDoWhileNode(struct node *bodyNode, struct node *expNode) {
+  nodeCreate(&(struct node){.type = NODE_TYPE_STATEMENT_DO_WHILE,
+                            .stmt.whileStmt.expNode = expNode,
+                            .stmt.whileStmt.bodyNode = bodyNode});
+}

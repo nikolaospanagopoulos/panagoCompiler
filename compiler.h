@@ -215,3 +215,4 @@ void makeReturnNode(struct node *expNode);
 void makeForNode(struct node *initNode, struct node *condNode,
                  struct node *loopNode, struct node *bodyNode);
 void makeWhileNode(struct node *expNode, struct node *bodyNode);
+void makeDoWhileNode(struct node *bodyNode, struct node *expNode);
