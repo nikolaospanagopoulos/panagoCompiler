@@ -1,1 +1,5 @@
-int main(int x, int y) { x = (20 + 30); }
+int main(int x, int y) {
+  if (1) {
+    int z = (20 + 30);
+  }
+}

@@ -505,6 +505,15 @@ void makeVariableNode(datatype *dtype, token *name, node *valueNode) {
                                       .var.val = valueNode,
                                       .var.type = *dtype});
 }
+static void expectKeyword(const char *keyword) {
+  struct token *nextToken = tokenNext();
+  if (!nextToken || nextToken->type != KEYWORD ||
+      !S_EQ(nextToken->sval, keyword)) {
+    compilerError(currentProcess,
+                  "Expecting the keyword %s but something else was provided",
+                  keyword);
+  }
+}
 static void expectOp(const char *op) {
   struct token *nextToken = tokenNext();
   if (!nextToken || nextToken->type != OPERATOR || !S_EQ(nextToken->sval, op)) {
@@ -997,11 +1006,26 @@ void parserIgnoreInt(datatype *datatype) {
   }
   tokenNext();
 }
+void parseIfStmt(history *hs) {
+  expectKeyword("if");
+  expectOp("(");
+  parseExpressionableRoot(hs);
+  expectSym(')');
+  struct node *condNode = nodePop();
+  size_t varSize = 0;
+  parseBody(&varSize, hs);
+  struct node *bodyNode = nodePop();
+  makeIfNode(condNode, bodyNode, NULL);
+}
 int parseKeyword(struct history *hs) {
   token *token = tokenPeekNext();
   if (isKeywordVariableModifier(token->sval) ||
       keywordIsDataType(token->sval)) {
     parseVariableFunctionStructUnion(hs);
+    return 0;
+  }
+  if (S_EQ(token->sval, "if")) {
+    parseIfStmt(hs);
     return 0;
   }
 

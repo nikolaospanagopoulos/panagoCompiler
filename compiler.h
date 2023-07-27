@@ -208,3 +208,5 @@ symbol *symresolverGetSymbolForNativeFunction(compileProcess *process,
 bool nodeIsExpressionOrParentheses(struct node *node);
 bool nodeIsValueType(struct node *node);
 void makeExpParenthesisNode(struct node *expNode);
+void makeIfNode(struct node *condNode, struct node *bodyNode,
+                struct node *nextNode);

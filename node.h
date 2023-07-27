@@ -124,6 +124,14 @@ typedef struct node {
       // stack size for all vars inside function
       size_t stackSize;
     } func;
+    struct statement {
+      struct ifStmt {
+        // if(COND)
+        struct node *condNode;
+        struct node *bodyNode;
+        struct node *next;
+      } ifStmt;
+    } stmt;
   };
 
   union {

@@ -183,3 +183,10 @@ bool nodeIsValueType(struct node *node) {
          node->type == NODE_TYPE_UNARY || node->type == NODE_TYPE_TENARY ||
          node->type == NODE_TYPE_STRING;
 }
+void makeIfNode(struct node *condNode, struct node *bodyNode,
+                struct node *nextNode) {
+  nodeCreate(&(struct node){.type = NODE_TYPE_STATEMENT_IF,
+                            .stmt.ifStmt.condNode = condNode,
+                            .stmt.ifStmt.bodyNode = bodyNode,
+                            .stmt.ifStmt.next = nextNode});
+}
