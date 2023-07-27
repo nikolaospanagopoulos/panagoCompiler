@@ -190,3 +190,7 @@ void makeIfNode(struct node *condNode, struct node *bodyNode,
                             .stmt.ifStmt.bodyNode = bodyNode,
                             .stmt.ifStmt.next = nextNode});
 }
+void makeElseNode(struct node *bodyNode) {
+  nodeCreate(&(struct node){.type = NODE_TYPE_STATEMENT_ELSE,
+                            .stmt.ifStmt.bodyNode = bodyNode});
+}

@@ -69,7 +69,6 @@ history *historyDown(history *hs, int flags) {
   vector_push(currentProcess->gb, &newHistory);
   return newHistory;
 }
-
 bool tokenIsSymbol(token *token, char c) {
   return token && token->type == SYMBOL && token->cval == c;
 }
@@ -104,6 +103,10 @@ static token *tokenPeekNext() {
   return vector_peek_no_increment(currentProcess->tokenVec);
 }
 
+static bool tokenNextIsKeyword(const char *keyword) {
+  token *token = tokenPeekNext();
+  return tokenIsKeyword(token, keyword);
+}
 static bool tokenNextIsSymbol(char c) {
   struct token *token = tokenPeekNext();
   return tokenIsSymbol(token, c);
@@ -1006,6 +1009,28 @@ void parserIgnoreInt(datatype *datatype) {
   }
   tokenNext();
 }
+struct node *parseElse(history *hs) {
+  size_t varSize = 0;
+  parseBody(&varSize, hs);
+  struct node *bodyNode = nodePop();
+  makeElseNode(bodyNode);
+  return nodePop();
+}
+void parseIfStmt(history *hs);
+struct node *parseElseOrElseIf(history *hs) {
+  struct node *node = NULL;
+  if (tokenNextIsKeyword("else")) {
+    tokenNext();
+    if (tokenNextIsKeyword("if")) {
+      parseIfStmt(historyDown(hs, 0));
+      node = nodePop();
+      return node;
+    }
+  }
+
+  return node;
+  ;
+}
 void parseIfStmt(history *hs) {
   expectKeyword("if");
   expectOp("(");
@@ -1015,7 +1040,7 @@ void parseIfStmt(history *hs) {
   size_t varSize = 0;
   parseBody(&varSize, hs);
   struct node *bodyNode = nodePop();
-  makeIfNode(condNode, bodyNode, NULL);
+  makeIfNode(condNode, bodyNode, parseElseOrElseIf(hs));
 }
 int parseKeyword(struct history *hs) {
   token *token = tokenPeekNext();

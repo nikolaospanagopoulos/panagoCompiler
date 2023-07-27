@@ -131,6 +131,9 @@ typedef struct node {
         struct node *bodyNode;
         struct node *next;
       } ifStmt;
+      struct elseStmt {
+        struct node *bodyNode;
+      } elseStmt;
     } stmt;
   };
 

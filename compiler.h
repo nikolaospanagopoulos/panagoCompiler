@@ -210,3 +210,4 @@ bool nodeIsValueType(struct node *node);
 void makeExpParenthesisNode(struct node *expNode);
 void makeIfNode(struct node *condNode, struct node *bodyNode,
                 struct node *nextNode);
+void makeElseNode(struct node *bodyNode);
