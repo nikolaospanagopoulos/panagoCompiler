@@ -211,3 +211,7 @@ void makeExpParenthesisNode(struct node *expNode);
 void makeIfNode(struct node *condNode, struct node *bodyNode,
                 struct node *nextNode);
 void makeElseNode(struct node *bodyNode);
+void makeReturnNode(struct node *expNode);
+void makeForNode(struct node *initNode, struct node *condNode,
+                 struct node *loopNode, struct node *bodyNode);
+void makeWhileNode(struct node *expNode, struct node *bodyNode);

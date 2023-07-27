@@ -1042,6 +1042,72 @@ void parseIfStmt(history *hs) {
   struct node *bodyNode = nodePop();
   makeIfNode(condNode, bodyNode, parseElseOrElseIf(hs));
 }
+void parseKeywordParenthesisExpression(const char *keyword) {
+  expectKeyword(keyword);
+  expectOp("(");
+  parseExpressionableRoot(historyBegin(0));
+  expectSym(')');
+}
+void parseWhile(history *hs) {
+  parseKeywordParenthesisExpression("while");
+  struct node *expNode = nodePop();
+  size_t varSize = 0;
+  parseBody(&varSize, hs);
+  struct node *bodyNode = nodePop();
+  makeWhileNode(expNode, bodyNode);
+}
+bool parseForLoopPart(history *hs) {
+  if (tokenNextIsSymbol(';')) {
+    tokenNext();
+    return false;
+  }
+  parseExpressionableRoot(hs);
+  expectSym(';');
+  return true;
+}
+bool parseForLoopPartLoop(history *hs) {
+  if (tokenNextIsSymbol(')')) {
+    return false;
+  }
+  parseExpressionableRoot(hs);
+  return true;
+}
+void parseForStmt(history *hs) {
+  struct node *initNode = NULL;
+  struct node *condNode = NULL;
+  struct node *loopNode = NULL;
+  struct node *bodyNode = NULL;
+  expectKeyword("for");
+  expectOp("(");
+  if (parseForLoopPart(hs)) {
+    initNode = nodePop();
+  }
+  if (parseForLoopPart(hs)) {
+    condNode = nodePop();
+  }
+  if (parseForLoopPartLoop(hs)) {
+    loopNode = nodePop();
+  }
+  expectSym(')');
+
+  size_t variableSize = 0;
+  parseBody(&variableSize, hs);
+  bodyNode = nodePop();
+
+  makeForNode(initNode, condNode, loopNode, bodyNode);
+}
+void parseReturn(history *hs) {
+  expectKeyword("return");
+  if (tokenNextIsSymbol(';')) {
+    expectSym(';');
+    makeReturnNode(NULL);
+    return;
+  }
+  parseExpressionableRoot(hs);
+  struct node *expressionNode = nodePop();
+  makeReturnNode(expressionNode);
+  expectSym(';');
+}
 int parseKeyword(struct history *hs) {
   token *token = tokenPeekNext();
   if (isKeywordVariableModifier(token->sval) ||
@@ -1049,8 +1115,20 @@ int parseKeyword(struct history *hs) {
     parseVariableFunctionStructUnion(hs);
     return 0;
   }
+  if (S_EQ(token->sval, "return")) {
+    parseReturn(hs);
+    return 0;
+  }
   if (S_EQ(token->sval, "if")) {
     parseIfStmt(hs);
+    return 0;
+  }
+  if (S_EQ(token->sval, "for")) {
+    parseForStmt(hs);
+    return 0;
+  }
+  if (S_EQ(token->sval, "while")) {
+    parseWhile(hs);
     return 0;
   }
 

@@ -125,6 +125,9 @@ typedef struct node {
       size_t stackSize;
     } func;
     struct statement {
+      struct returnStmt {
+        struct node *expression;
+      } returnStmt;
       struct ifStmt {
         // if(COND)
         struct node *condNode;
@@ -134,6 +137,20 @@ typedef struct node {
       struct elseStmt {
         struct node *bodyNode;
       } elseStmt;
+      struct forStmt {
+        struct node *initNode;
+        struct node *condNode;
+        struct node *loopNode;
+        struct node *bodyNode;
+      } forStmt;
+      struct whileStmt {
+        struct node *expNode;
+        struct node *bodyNode;
+      } whileStmt;
+      struct doWhileStmt {
+        struct node *expNode;
+        struct node *bodyNode;
+      } doWhileStmt;
     } stmt;
   };
 

@@ -194,3 +194,20 @@ void makeElseNode(struct node *bodyNode) {
   nodeCreate(&(struct node){.type = NODE_TYPE_STATEMENT_ELSE,
                             .stmt.ifStmt.bodyNode = bodyNode});
 }
+
+void makeReturnNode(struct node *expNode) {
+  nodeCreate(&(struct node){.type = NODE_TYPE_STATEMENT_RETURN,
+                            .stmt.returnStmt.expression = expNode});
+}
+void makeForNode(struct node *initNode, struct node *condNode,
+                 struct node *loopNode, struct node *bodyNode) {
+  nodeCreate(&(struct node){.type = NODE_TYPE_STATEMENT_FOR,
+                            .stmt.forStmt.initNode = initNode,
+                            .stmt.forStmt.loopNode = loopNode,
+                            .stmt.forStmt.bodyNode = bodyNode});
+}
+void makeWhileNode(struct node *expNode, struct node *bodyNode) {
+  nodeCreate(&(struct node){.type = NODE_TYPE_STATEMENT_WHILE,
+                            .stmt.whileStmt.expNode = expNode,
+                            .stmt.whileStmt.bodyNode = bodyNode});
+}
