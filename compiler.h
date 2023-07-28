@@ -216,3 +216,5 @@ void makeForNode(struct node *initNode, struct node *condNode,
                  struct node *loopNode, struct node *bodyNode);
 void makeWhileNode(struct node *expNode, struct node *bodyNode);
 void makeDoWhileNode(struct node *bodyNode, struct node *expNode);
+void makeSwitchNode(struct node *expNode, struct node *bodyNode,
+                    struct vector *cases, bool hasDefaultCase);

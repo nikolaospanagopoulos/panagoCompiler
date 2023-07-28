@@ -51,6 +51,9 @@ enum {
 struct arrayBrackets {
   struct vector *nBrackets;
 };
+struct parsedSwitchedCase {
+  int index;
+};
 struct node;
 typedef struct datatype {
   int flags;
@@ -151,6 +154,12 @@ typedef struct node {
         struct node *expNode;
         struct node *bodyNode;
       } doWhileStmt;
+      struct switchStmt {
+        struct node *exp;
+        struct node *body;
+        struct vector *cases;
+        bool hasDefaultCase;
+      } switchStmt;
     } stmt;
   };
 

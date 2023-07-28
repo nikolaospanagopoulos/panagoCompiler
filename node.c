@@ -216,3 +216,11 @@ void makeDoWhileNode(struct node *bodyNode, struct node *expNode) {
                             .stmt.whileStmt.expNode = expNode,
                             .stmt.whileStmt.bodyNode = bodyNode});
 }
+void makeSwitchNode(struct node *expNode, struct node *bodyNode,
+                    struct vector *cases, bool hasDefaultCase) {
+  nodeCreate(&(struct node){.type = NODE_TYPE_STATEMENT_SWITCH,
+                            .stmt.switchStmt.exp = expNode,
+                            .stmt.switchStmt.body = bodyNode,
+                            .stmt.switchStmt.cases = cases,
+                            .stmt.switchStmt.hasDefaultCase = hasDefaultCase});
+}

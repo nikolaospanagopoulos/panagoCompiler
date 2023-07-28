@@ -47,13 +47,36 @@ enum {
   HISTORY_FLAG_IS_UPWARD_STACK = 0b00000010,
   HISTORY_FLAG_IS_GLOBAL_SCOPE = 0b00000100,
   HISTORY_FLAG_INSIDE_STRUCT = 0b00001000,
-  HISTORY_FLAG_INSIDE_FUNCTION_BODY = 0b00010000
+  HISTORY_FLAG_INSIDE_FUNCTION_BODY = 0b00010000,
+  HISTORY_FLAG_INSIDE_SWITCH_STMT = 0b00100000
 };
-
+struct historyCases {
+  struct vector *cases;
+  bool hasDefaultCase;
+};
 typedef struct history {
   int flags;
+  struct parserHistorySwitch {
+    struct historyCases caseData;
+  } _switch;
 } history;
 
+struct parserHistorySwitch parserNewSwitchStmt(history *hs) {
+  // TODO::: MAYBE CHANGE
+  memset(&hs->_switch, 0, sizeof(hs->_switch));
+  hs->_switch.caseData.cases = vector_create(sizeof(struct parsedSwitchedCase));
+  vector_push(currentProcess->gbForVectors, &hs->_switch.caseData.cases);
+  hs->flags |= HISTORY_FLAG_INSIDE_SWITCH_STMT;
+  return hs->_switch;
+}
+void parserRegisterCase(history *hs, struct node *caseNode) {
+  if (!(hs->flags & HISTORY_FLAG_INSIDE_SWITCH_STMT)) {
+    compilerError(currentProcess, "Not inside switch statement\n");
+  }
+  struct parsedSwitchedCase scase;
+  scase.index = 0;
+  vector_push(hs->_switch.caseData.cases, &scase);
+}
 void parseExpressionableRoot(history *hs);
 int parseKeyword(struct history *hs);
 history *historyBegin(int flags) {
@@ -1048,6 +1071,16 @@ void parseKeywordParenthesisExpression(const char *keyword) {
   parseExpressionableRoot(historyBegin(0));
   expectSym(')');
 }
+void parseSwitch(history *hs) {
+  struct parserHistorySwitch _switch = parserNewSwitchStmt(hs);
+  parseKeywordParenthesisExpression("switch");
+  struct node *switchExpNode = nodePop();
+  size_t varSize = 0;
+  parseBody(&varSize, hs);
+  struct node *bodyNode = nodePop();
+  makeSwitchNode(switchExpNode, bodyNode, _switch.caseData.cases,
+                 _switch.caseData.hasDefaultCase);
+}
 void parseDoWhile(history *hs) {
   expectKeyword("do");
   size_t varSize = 0;
@@ -1145,7 +1178,9 @@ int parseKeyword(struct history *hs) {
     parseDoWhile(hs);
     return 0;
   }
-
+  if (S_EQ(token->sval, "switch")) {
+    parseSwitch(hs);
+  }
   // we ll see, maybe free it with garbage vec
   return 0;
 }
