@@ -98,6 +98,10 @@ typedef struct node {
     struct varlist {
       struct vector *list;
     } varlist;
+    struct nodeTenary {
+      struct node *trueNode;
+      struct node *falseNode;
+    } tenary;
     struct bracket {
       struct node *inner;
     } bracket;
@@ -160,7 +164,16 @@ typedef struct node {
         struct vector *cases;
         bool hasDefaultCase;
       } switchStmt;
+      struct gotoStmt {
+        struct node *labelNode;
+      } gotoStmt;
+      struct caseStmt {
+        struct node *exp;
+      } _case;
     } stmt;
+    struct nodeLabel {
+      struct node *name;
+    } nodeLabel;
   };
 
   union {

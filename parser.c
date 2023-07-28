@@ -48,7 +48,8 @@ enum {
   HISTORY_FLAG_IS_GLOBAL_SCOPE = 0b00000100,
   HISTORY_FLAG_INSIDE_STRUCT = 0b00001000,
   HISTORY_FLAG_INSIDE_FUNCTION_BODY = 0b00010000,
-  HISTORY_FLAG_INSIDE_SWITCH_STMT = 0b00100000
+  HISTORY_FLAG_INSIDE_SWITCH_STMT = 0b00100000,
+  HISTORY_FLAG_PARENTHESES_NOT_A_FUNCTION_CALL = 0b01000000
 };
 struct historyCases {
   struct vector *cases;
@@ -278,9 +279,13 @@ void parseForParentheses(history *hs) {
   }
   parserDealWithAdditionalExpression();
 }
+void parseTenary(history *hs);
 int parseExp(history *hs) {
   if (S_EQ(tokenPeekNext()->sval, "(")) {
     parseForParentheses(hs);
+    return 0;
+  } else if (S_EQ(tokenPeekNext()->sval, "?")) {
+    parseTenary(hs);
     return 0;
   } else {
     int res = parseExpressionNormal(hs);
@@ -713,6 +718,15 @@ void parseFunction(struct datatype *retType, struct token *nameToken,
   parserCurrentFunction = NULL;
   parserScopeFinish(currentProcess);
 }
+void parseGoto(history *hs) {
+  expectKeyword("goto");
+  parseIdentifier(historyBegin(0));
+  expectSym(';');
+
+  struct node *labelNode = nodePop();
+  makeGotoNode(labelNode);
+}
+void parseLabel(history *hs);
 void parseSymbol() {
   if (tokenNextIsSymbol('{')) {
     size_t variableSize = 0;
@@ -720,7 +734,11 @@ void parseSymbol() {
     parseBody(&variableSize, hs);
     struct node *bodyNode = nodePop();
     nodePush(bodyNode);
+  } else if (tokenNextIsSymbol(':')) {
+    parseLabel(historyBegin(0));
+    return;
   }
+  compilerError(currentProcess, "Invalid symbol was provided\n");
 }
 void parseStatement(history *hs) {
   if (tokenPeekNext()->type == KEYWORD) {
@@ -1071,6 +1089,18 @@ void parseKeywordParenthesisExpression(const char *keyword) {
   parseExpressionableRoot(historyBegin(0));
   expectSym(')');
 }
+void parseCase(history *hs) {
+  expectKeyword("case");
+  parseExpressionableRoot(hs);
+  struct node *caseExpNode = nodePop();
+  expectSym(':');
+  makeCaseNode(caseExpNode);
+  if (caseExpNode->type != NODE_TYPE_NUMBER) {
+    compilerError(currentProcess, "We only support numeric cases \n");
+  }
+  struct node *caseNode = nodePop();
+  parserRegisterCase(hs, caseNode);
+}
 void parseSwitch(history *hs) {
   struct parserHistorySwitch _switch = parserNewSwitchStmt(hs);
   parseKeywordParenthesisExpression("switch");
@@ -1151,6 +1181,40 @@ void parseReturn(history *hs) {
   makeReturnNode(expressionNode);
   expectSym(';');
 }
+void parseLabel(history *hs) {
+  expectSym(':');
+  struct node *labelNameNode = nodePop();
+  if (labelNameNode->type != NODE_TYPE_IDENTIFIER) {
+    compilerError(
+        currentProcess,
+        "Expecting identifier for labels. Something else was provided \n");
+  }
+  makeLabelNode(labelNameNode);
+}
+void parseContinue(history *hs) {
+  expectKeyword("continue");
+  expectSym(';');
+  makeContinueNode();
+}
+void parseBreak(history *hs) {
+  expectKeyword("break");
+  expectSym(';');
+  makeBreakNode();
+}
+void parseTenary(history *hs) {
+  struct node *conditionNode = nodePop();
+  expectOp("?");
+  parseExpressionableRoot(
+      historyDown(hs, HISTORY_FLAG_PARENTHESES_NOT_A_FUNCTION_CALL));
+  struct node *trueResultNode = nodePop();
+  expectSym(':');
+  parseExpressionableRoot(
+      historyDown(hs, HISTORY_FLAG_PARENTHESES_NOT_A_FUNCTION_CALL));
+  struct node *falseResultNode = nodePop();
+  makeTenaryNode(trueResultNode, falseResultNode);
+  struct node *tenaryNode = nodePop();
+  makeExpNode(conditionNode, tenaryNode, "?");
+}
 int parseKeyword(struct history *hs) {
   token *token = tokenPeekNext();
   if (isKeywordVariableModifier(token->sval) ||
@@ -1180,9 +1244,27 @@ int parseKeyword(struct history *hs) {
   }
   if (S_EQ(token->sval, "switch")) {
     parseSwitch(hs);
+    return 0;
+  }
+  if (S_EQ(token->sval, "continue")) {
+    parseContinue(hs);
+    return 0;
+  }
+  if (S_EQ(token->sval, "break")) {
+    parseBreak(hs);
+    return 0;
+  }
+  if (S_EQ(token->sval, "goto")) {
+    parseGoto(hs);
+    return 0;
+  }
+  if (S_EQ(token->sval, "case")) {
+    parseCase(hs);
+    return 0;
   }
   // we ll see, maybe free it with garbage vec
-  return 0;
+  compilerError(currentProcess, "invalid keyword");
+  return -1;
 }
 int parseExpressionableSingle(history *hs) {
   token *token = tokenPeekNext();
@@ -1233,6 +1315,7 @@ int parseNext() {
   case IDENTIFIER:
   case STRING:
     parseExpressionable(historyBegin(0));
+    res = 0;
     break;
   case KEYWORD:
     parseKeywordForGlobal();

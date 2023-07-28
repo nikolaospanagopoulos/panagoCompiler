@@ -218,3 +218,9 @@ void makeWhileNode(struct node *expNode, struct node *bodyNode);
 void makeDoWhileNode(struct node *bodyNode, struct node *expNode);
 void makeSwitchNode(struct node *expNode, struct node *bodyNode,
                     struct vector *cases, bool hasDefaultCase);
+void makeContinueNode();
+void makeBreakNode();
+void makeLabelNode(struct node *labelNode);
+void makeGotoNode(struct node *labelNode);
+void makeCaseNode(struct node *labelNode);
+void makeTenaryNode(struct node *trueNode, struct node *falseNode);

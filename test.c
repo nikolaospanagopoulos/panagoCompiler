@@ -1,4 +1,1 @@
-void main(int x, int y) {
-  int i = 0;
-  switch (1) {}
-}
+int main(int x) { x = 50 ? 20 : 10; }

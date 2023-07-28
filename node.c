@@ -224,3 +224,26 @@ void makeSwitchNode(struct node *expNode, struct node *bodyNode,
                             .stmt.switchStmt.cases = cases,
                             .stmt.switchStmt.hasDefaultCase = hasDefaultCase});
 }
+void makeContinueNode() {
+  nodeCreate(&(struct node){.type = NODE_TYPE_STATEMENT_CONTINUE});
+}
+void makeBreakNode() {
+  nodeCreate(&(struct node){.type = NODE_TYPE_STATEMENT_BREAK});
+}
+void makeLabelNode(struct node *labelNode) {
+  nodeCreate(
+      &(struct node){.type = NODE_TYPE_LABEL, .nodeLabel.name = labelNode});
+}
+void makeGotoNode(struct node *labelNode) {
+  nodeCreate(&(struct node){.type = NODE_TYPE_STATEMENT_GOTO,
+                            .stmt.gotoStmt.labelNode = labelNode});
+}
+void makeCaseNode(struct node *labelNode) {
+  nodeCreate(&(struct node){.type = NODE_TYPE_STATEMENT_CASE,
+                            .stmt._case.exp = labelNode});
+}
+void makeTenaryNode(struct node *trueNode, struct node *falseNode) {
+  nodeCreate(&(struct node){.type = NODE_TYPE_TENARY,
+                            .tenary.trueNode = trueNode,
+                            .tenary.falseNode = falseNode});
+}
