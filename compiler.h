@@ -227,3 +227,6 @@ void makeTenaryNode(struct node *trueNode, struct node *falseNode);
 void makeCastNode(struct datatype *dtype, struct node *opperandNode);
 void makeUnionNode(const char *name, struct node *bodyNode);
 struct node *unionNodeForName(compileProcess *process, const char *name);
+bool isArrayNode(struct node *node);
+bool nodeIsExpression(struct node *node, const char *op);
+bool isNodeAssignment(struct node *node);

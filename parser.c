@@ -208,6 +208,14 @@ node *nodeShiftChildrenLeft(node *node) {
   node->exp.op = rightOp;
   return node;
 }
+void parserNodeMoveRightLeftToLeft(struct node *node) {
+  makeExpNode(node->exp.left, node->exp.right, node->exp.op);
+  struct node *completedNode = nodePop();
+  const char *newOp = node->exp.right->exp.op;
+  node->exp.left = completedNode;
+  node->exp.right = node->exp.right->exp.right;
+  node->exp.op = newOp;
+}
 void parserReorderExpressionNode(struct node **nodeOut) {
   node *node = *nodeOut;
   if (node->type != NODE_TYPE_EXPRESSION) {
@@ -227,6 +235,12 @@ void parserReorderExpressionNode(struct node **nodeOut) {
       parserReorderExpressionNode(&nodeC->exp.left);
       parserReorderExpressionNode(&nodeC->exp.right);
     }
+  }
+  if ((isArrayNode(node->exp.left) && isNodeAssignment(node->exp.right)) ||
+      (nodeIsExpression(node->exp.left, "()") ||
+       nodeIsExpression(node->exp.left, "[]")) &&
+          nodeIsExpression(node->exp.right, ",")) {
+    parserNodeMoveRightLeftToLeft(node);
   }
 }
 

@@ -271,3 +271,16 @@ void makeCastNode(struct datatype *dtype, struct node *opperandNode) {
                             .cast.dtype = *dtype,
                             .cast.operand = opperandNode});
 }
+bool nodeIsExpression(struct node *node, const char *op) {
+  return node->type == NODE_TYPE_EXPRESSION && S_EQ(node->exp.op, op);
+}
+bool isArrayNode(struct node *node) { return nodeIsExpression(node, "[]"); }
+bool isNodeAssignment(struct node *node) {
+  if (node->type != NODE_TYPE_EXPRESSION) {
+    return false;
+  }
+
+  return S_EQ(node->exp.op, "=") || S_EQ(node->exp.op, "+=") ||
+         S_EQ(node->exp.op, "-=") || S_EQ(node->exp.op, "/=") ||
+         S_EQ(node->exp.op, "*=");
+}
