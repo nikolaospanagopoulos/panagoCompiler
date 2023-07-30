@@ -110,6 +110,11 @@ typedef struct node {
       struct node *body_n;
       struct node *var;
     } _struct;
+    struct _union {
+      const char *name;
+      struct node *body_n;
+      struct node *var;
+    } _union;
     struct body {
       struct vector *statements;
       size_t size;
@@ -174,6 +179,10 @@ typedef struct node {
     struct nodeLabel {
       struct node *name;
     } nodeLabel;
+    struct cast {
+      struct datatype dtype;
+      struct node *operand;
+    } cast;
   };
 
   union {

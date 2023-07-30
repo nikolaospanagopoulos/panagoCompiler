@@ -27,6 +27,7 @@ typedef struct compileProcess {
     const char *absolutePath;
   } cfile;
   FILE *outFile;
+  struct fixupSystem *parserFixupSystem;
   struct vector *tokenVec;
   struct vector *nodeVec;
   struct vector *nodeTreeVec;

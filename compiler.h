@@ -224,3 +224,6 @@ void makeLabelNode(struct node *labelNode);
 void makeGotoNode(struct node *labelNode);
 void makeCaseNode(struct node *labelNode);
 void makeTenaryNode(struct node *trueNode, struct node *falseNode);
+void makeCastNode(struct datatype *dtype, struct node *opperandNode);
+void makeUnionNode(const char *name, struct node *bodyNode);
+struct node *unionNodeForName(compileProcess *process, const char *name);

@@ -1,5 +1,6 @@
 #include "compileProcess.h"
 #include "compiler.h"
+#include "fixup.h"
 #include "node.h"
 #include "token.h"
 #include "vector.h"
@@ -78,7 +79,9 @@ void freeCompileProcess(compileProcess *cp) {
   }
 
   vector_free(cp->gbForVectors);
+
   scopeFreeRoot(cp);
+  fixupSystemFree(cp->parserFixupSystem);
   vector_free(cp->gb);
 }
 

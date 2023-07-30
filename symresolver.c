@@ -77,7 +77,13 @@ void symresolverBuildForStructureNode(compileProcess *process, node *node) {
   symresolverRegisterSymbol(process, node->_struct.name, SYMBOL_TYPE_NODE,
                             node);
 }
-void symresolverBuildForUnionNode(compileProcess *process, node *node) {}
+void symresolverBuildForUnionNode(compileProcess *process, node *node) {
+
+  if (node->flags & NODE_FLAG_IS_FORWARD_DECLERATION) {
+    return;
+  }
+  symresolverRegisterSymbol(process, node->_union.name, SYMBOL_TYPE_NODE, node);
+}
 void symresolverBuildForNode(compileProcess *process, node *node) {
   switch (node->type) {
   case NODE_TYPE_VARIABLE:

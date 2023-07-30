@@ -109,8 +109,7 @@ struct node *variableNode(struct node *node) {
     varNode = node->_struct.var;
     break;
   case NODE_TYPE_UNION:
-    printf("unions are not yet supported\n");
-    exit(-1);
+    varNode = node->_union.var;
     break;
   }
   return varNode;
@@ -133,6 +132,16 @@ void makeStructNode(const char *name, struct node *bodyNode) {
                             ._struct.name = name,
                             .flags = flags});
 }
+void makeUnionNode(const char *name, struct node *bodyNode) {
+  int flags = 0;
+  if (!bodyNode) {
+    flags |= NODE_FLAG_IS_FORWARD_DECLERATION;
+  }
+  nodeCreate(&(struct node){.type = NODE_TYPE_UNION,
+                            ._union.body_n = bodyNode,
+                            ._union.name = name,
+                            .flags = flags});
+}
 struct node *nodeFromSym(struct symbol *sym) {
   if (sym->type != SYMBOL_TYPE_NODE) {
     return NULL;
@@ -152,6 +161,16 @@ struct node *structNodeForName(compileProcess *process, const char *name) {
     return NULL;
   }
   if (node->type != NODE_TYPE_STRUCT) {
+    return NULL;
+  }
+  return node;
+}
+struct node *unionNodeForName(compileProcess *process, const char *name) {
+  struct node *node = nodeFromSymbol(process, name);
+  if (!node) {
+    return NULL;
+  }
+  if (node->type != NODE_TYPE_UNION) {
     return NULL;
   }
   return node;
@@ -246,4 +265,9 @@ void makeTenaryNode(struct node *trueNode, struct node *falseNode) {
   nodeCreate(&(struct node){.type = NODE_TYPE_TENARY,
                             .tenary.trueNode = trueNode,
                             .tenary.falseNode = falseNode});
+}
+void makeCastNode(struct datatype *dtype, struct node *opperandNode) {
+  nodeCreate(&(struct node){.type = NODE_TYPE_CAST,
+                            .cast.dtype = *dtype,
+                            .cast.operand = opperandNode});
 }

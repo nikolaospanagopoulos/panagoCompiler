@@ -1,1 +1,4 @@
-int main(int x) { x = 50 ? 20 : 10; }
+union abc {
+  int x;
+} kk;
+int main(int x) { x = (int)30; }

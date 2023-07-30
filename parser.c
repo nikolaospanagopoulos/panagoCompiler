@@ -1,5 +1,6 @@
 #include "compileProcess.h"
 #include "compiler.h"
+#include "fixup.h"
 #include "node.h"
 #include "position.h"
 #include "token.h"
@@ -10,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 static struct compileProcess *currentProcess;
+static struct fixupSystem *parserFixupSystem;
 static token *parserLastToken;
 extern struct node *parserCurrentBody;
 extern struct expressionableOpPrecedenceGroup
@@ -22,6 +24,7 @@ enum {
 
 };
 
+void parseDatatype(datatype *dtype);
 struct parserScopeEntity {
   int flags;
   int stackOffset;
@@ -31,6 +34,7 @@ struct parserScopeEntity {
 static void expectSym(char c);
 static void expectOp(const char *op);
 void parserScopeNew();
+void parseCast();
 struct parserScopeEntity *parserScopeEntityNew(node *node, int stackOffset,
                                                int flags) {
   struct parserScopeEntity *entity =
@@ -75,7 +79,7 @@ void parserRegisterCase(history *hs, struct node *caseNode) {
     compilerError(currentProcess, "Not inside switch statement\n");
   }
   struct parsedSwitchedCase scase;
-  scase.index = 0;
+  scase.index = caseNode->stmt._case.exp->llnum;
   vector_push(hs->_switch.caseData.cases, &scase);
 }
 void parseExpressionableRoot(history *hs);
@@ -260,6 +264,10 @@ void parserDealWithAdditionalExpression() {
 }
 void parseForParentheses(history *hs) {
   expectOp("(");
+  if (tokenPeekNext()->type == KEYWORD) {
+    parseCast();
+    return;
+  }
   struct node *leftNode = NULL;
   struct node *tmpNode = nodePeekOrNull();
   if (tmpNode && nodeIsValueType(tmpNode)) {
@@ -280,12 +288,49 @@ void parseForParentheses(history *hs) {
   parserDealWithAdditionalExpression();
 }
 void parseTenary(history *hs);
+void parseForComma(history *hs) {
+  tokenNext();
+  struct node *left = nodePop();
+  parseExpressionableRoot(hs);
+  struct node *right = nodePop();
+  makeExpNode(left, right, ",");
+}
+void parseForArray(history *hs) {
+  struct node *left = nodePeekOrNull();
+  if (left) {
+    nodePop();
+  }
+  expectOp("[");
+  parseExpressionableRoot(hs);
+  expectSym(']');
+  struct node *expNode = nodePop();
+  makeBracketNode(expNode);
+  if (left) {
+    struct node *bracketNode = nodePop();
+    makeExpNode(left, bracketNode, "[]");
+  }
+}
+void parseCast() {
+  struct datatype dtype = {};
+  parseDatatype(&dtype);
+  expectSym(')');
+  parseExpressionable(historyBegin(0));
+  struct node *opperandNode = nodePop();
+  makeCastNode(&dtype, opperandNode);
+}
 int parseExp(history *hs) {
   if (S_EQ(tokenPeekNext()->sval, "(")) {
     parseForParentheses(hs);
     return 0;
   } else if (S_EQ(tokenPeekNext()->sval, "?")) {
     parseTenary(hs);
+    return 0;
+
+  } else if (S_EQ(tokenPeekNext()->sval, "[")) {
+    parseForArray(hs);
+    return 0;
+  } else if (S_EQ(tokenPeekNext()->sval, ",")) {
+    parseForComma(hs);
     return 0;
   } else {
     int res = parseExpressionNormal(hs);
@@ -453,6 +498,20 @@ size_t sizeOfStruct(const char *structName) {
   }
   return node->_struct.body_n->body.size;
 }
+size_t sizeOfUnion(const char *unionName) {
+  struct symbol *sym = symresolverGetSymbol(currentProcess, unionName);
+  if (!sym) {
+    return 0;
+  }
+  if (sym->type != SYMBOL_TYPE_NODE) {
+    compilerError(currentProcess, "Symbol is not a node \n");
+  }
+  struct node *node = sym->data;
+  if (node->type != NODE_TYPE_UNION) {
+    compilerError(currentProcess, "node is not a struct \n");
+  }
+  return node->_union.body_n->body.size;
+}
 void parserInitDatatypeTypeAndSize(token *datatypeToken,
                                    token *datatypeSecToken, datatype *typeOut,
                                    int ptrDepth, int expectedType) {
@@ -472,7 +531,9 @@ void parserInitDatatypeTypeAndSize(token *datatypeToken,
         structNodeForName(currentProcess, datatypeToken->sval);
     break;
   case DATA_TYPE_EXPECT_UNION:
-    compilerError(currentProcess, "Cannot use unions yet \n");
+    typeOut->type = DATA_TYPE_UNION;
+    typeOut->size = sizeOfUnion(datatypeToken->sval);
+    typeOut->unionNode = unionNodeForName(currentProcess, datatypeToken->sval);
     break;
   default:
     compilerError(currentProcess, "Unsupported datatype expectation \n");
@@ -525,16 +586,44 @@ void parseExpressionableRoot(history *hs) {
   node *resultNode = nodePop();
   nodePush(resultNode);
 }
+struct datatypeStructNodeFixPrivate {
+  struct node *node;
+};
+bool datatypeStructNodeFix(struct fixup *fixup) {
+  struct datatypeStructNodeFixPrivate *privateF = fixupPrivate(fixup);
+  struct datatype *dtype = &privateF->node->var.type;
+  dtype->type = DATA_TYPE_STRUCT;
+  dtype->size = sizeOfStruct(dtype->typeStr);
+  dtype->structNode = structNodeForName(currentProcess, dtype->typeStr);
+  if (!dtype->structNode) {
+    return false;
+  }
+  return true;
+}
+void datatypeStructNodeEnd(struct fixup *fixup) { free(fixupPrivate(fixup)); }
 void makeVariableNode(datatype *dtype, token *name, node *valueNode) {
   const char *nameStr = NULL;
   if (name) {
     nameStr = name->sval;
   }
 
-  node *f = nodeCreate(&(struct node){.type = NODE_TYPE_VARIABLE,
-                                      .var.name = nameStr,
-                                      .var.val = valueNode,
-                                      .var.type = *dtype});
+  nodeCreate(&(struct node){.type = NODE_TYPE_VARIABLE,
+                            .var.name = nameStr,
+                            .var.val = valueNode,
+                            .var.type = *dtype});
+  struct node *varNode = nodePeekOrNull();
+  if (varNode->var.type.type == DATA_TYPE_STRUCT &&
+      !varNode->var.type.structNode) {
+    struct datatypeStructNodeFixPrivate *private =
+        calloc(1, sizeof(struct datatypeStructNodeFixPrivate));
+    vector_push(currentProcess->gb, &private);
+    private->node = varNode;
+
+    fixupRegister(parserFixupSystem,
+                  &(struct fixupConfig){.fix = datatypeStructNodeFix,
+                                        .end = datatypeStructNodeEnd,
+                                        .privateData = private});
+  }
 }
 static void expectKeyword(const char *keyword) {
   struct token *nextToken = tokenNext();
@@ -794,8 +883,10 @@ node *variableStructOrUnionBodyNode(struct node *node) {
   if (node->var.type.type == DATA_TYPE_STRUCT) {
     return node->var.type.structNode->_struct.body_n;
   }
-  compilerWarning(currentProcess, "Union body not implemented yet \n");
-  exit(1);
+  if (node->var.type.type == DATA_TYPE_UNION) {
+    return node->var.type.unionNode->_union.body_n;
+  }
+  return NULL;
 }
 void parserAppendSizeForNodeStructUnion(history *hs, size_t *varSize,
                                         struct node *node) {
@@ -911,6 +1002,11 @@ void parseBody(size_t *variableSize, history *hs) {
   }
   parseBodyMultipleStatements(variableSize, bodyVec, hs);
   parserScopeFinish(currentProcess);
+  if (variableSize) {
+    if (hs->flags & HISTORY_FLAG_INSIDE_FUNCTION_BODY) {
+      parserCurrentFunction->func.stackSize += *variableSize;
+    }
+  }
 }
 
 void parseStructNoNewScope(datatype *type, bool isForwardDecleration) {
@@ -941,6 +1037,37 @@ void parseStructNoNewScope(datatype *type, bool isForwardDecleration) {
   expectSym(';');
   nodePush(structNode);
 }
+void parseUnionNoScope(struct datatype *dtype, bool isForwardDecleration) {
+  struct node *bodyNode = NULL;
+  size_t bodyVariableSize = 0;
+  if (!isForwardDecleration) {
+    parseBody(&bodyVariableSize, historyBegin(HISTORY_FLAG_INSIDE_UNION));
+    bodyNode = nodePop();
+  }
+  makeUnionNode(dtype->typeStr, bodyNode);
+  struct node *unionNode = nodePop();
+  if (bodyNode) {
+    dtype->size = bodyNode->body.size;
+  }
+  if (tokenPeekNext()->type == IDENTIFIER) {
+    token *varName = tokenNext();
+    unionNode->flags |= NODE_FLAG_HAS_VARIABLE_COMBINED;
+    makeVariableNodeAndRegister(historyBegin(0), dtype, varName, NULL);
+    unionNode->_union.var = nodePop();
+  }
+  expectSym(';');
+  nodePush(unionNode);
+}
+void parseUnion(struct datatype *dtype) {
+  bool isForwardDecleration = !tokenIsSymbol(tokenPeekNext(), '{');
+  if (!isForwardDecleration) {
+    parserScopeNew();
+  }
+  parseUnionNoScope(dtype, isForwardDecleration);
+  if (!isForwardDecleration) {
+    parserScopeFinish(currentProcess);
+  }
+}
 void parseStruct(struct datatype *dtype) {
   bool isForwardDecleration = !tokenIsSymbol(tokenPeekNext(), '{');
   if (!isForwardDecleration) {
@@ -957,6 +1084,7 @@ void parseStructOrUnion(struct datatype *dtype) {
     parseStruct(dtype);
     break;
   case DATA_TYPE_UNION:
+    parseUnion(dtype);
     break;
   default:
     compilerError(currentProcess,
@@ -999,6 +1127,7 @@ struct vector *parseFunctionArguments(history *hs) {
   parserScopeFinish(currentProcess);
   return argumentsVector;
 }
+void parseForwardDecleration(struct datatype *dtype) { parseStruct(dtype); }
 void parseVariableFunctionStructUnion(struct history *hs) {
   datatype dtype;
   parseDatatype(&dtype);
@@ -1008,6 +1137,12 @@ void parseVariableFunctionStructUnion(struct history *hs) {
     struct node *suNode = nodePop();
     symresolverBuildForNode(currentProcess, suNode);
     nodePush(suNode);
+    return;
+  }
+
+  // forward decleration
+  if (tokenNextIsSymbol(';')) {
+    parseForwardDecleration(&dtype);
     return;
   }
 
@@ -1337,6 +1472,8 @@ int parse(compileProcess *process) {
   nodeSetVector(process->nodeVec, process->nodeTreeVec, process->nodeGarbageVec,
                 process->gbForVectors);
   parserBlancNode = nodeCreate(&(struct node){.type = NODE_TYPE_BLANK});
+  parserFixupSystem = fixupSystemNew();
+  currentProcess->parserFixupSystem = parserFixupSystem;
   struct node *node = NULL;
 
   vector_set_peek_pointer(process->tokenVec, 0);
@@ -1351,5 +1488,8 @@ int parse(compileProcess *process) {
 
   vector_set_peek_pointer(currentProcess->nodeVec, 0);
   struct node **nodeToClean = (struct node **)vector_peek(process->nodeVec);
+  if (!fixupsResolve(parserFixupSystem)) {
+    compilerError(currentProcess, "There is an unresolved reference \n");
+  }
   return PARSE_ALL_OK;
 }
