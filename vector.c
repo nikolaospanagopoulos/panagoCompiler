@@ -1,6 +1,4 @@
 #include "vector.h"
-#include "compileProcess.h"
-#include "compiler.h"
 #include "node.h"
 #include "token.h"
 #include <assert.h>

@@ -1,11 +1,8 @@
-#ifndef VECTOR_H
-#define VECTOR_H
-
+#pragma once
 #include "compileProcess.h"
 #include "compiler.h"
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -141,5 +138,3 @@ size_t vector_element_size(struct vector *vector);
  * Clones the given vector including all vector data, saves are ignored
  */
 struct vector *vector_clone(struct vector *vector);
-
-#endif

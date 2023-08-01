@@ -74,6 +74,7 @@ typedef struct lexProcess {
 } lexProcess;
 
 enum { PARSE_ALL_OK, PARSE_ERROR };
+enum { CODEGEN_ALL_OK, CODEGEN_ERROR };
 
 #define TOTAL_OPERATOR_GROUPS 14
 #define MAX_OPERATORS_IN_GROUP 12
@@ -230,3 +231,4 @@ struct node *unionNodeForName(compileProcess *process, const char *name);
 bool isArrayNode(struct node *node);
 bool nodeIsExpression(struct node *node, const char *op);
 bool isNodeAssignment(struct node *node);
+int codegen(struct compileProcess *process);

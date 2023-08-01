@@ -1,8 +1,5 @@
-#ifndef BUFFER_H
-#define BUFFER_H
-
+#pragma once
 #include <stddef.h>
-#include <stdint.h>
 
 #define BUFFER_REALLOC_AMOUNT 2000
 struct buffer {
@@ -24,5 +21,3 @@ void buffer_printf_no_terminator(struct buffer *buffer, const char *fmt, ...);
 void buffer_write(struct buffer *buffer, char c);
 void *buffer_ptr(struct buffer *buffer);
 void buffer_free(struct buffer *buffer);
-
-#endif
