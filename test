@@ -1,3 +1,12 @@
 section .data
+; type: int, name: x
+
+x: dd 0
+; type: int, name: y
+
+y: dd 0
+; type: char, name: c
+
+c: db 0
 section .text
 section .rodata

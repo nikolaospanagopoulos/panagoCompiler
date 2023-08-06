@@ -3,7 +3,9 @@
 #include "node.h"
 #include "vector.h"
 #include <stdarg.h>
+#include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 
 static struct compileProcess *currentProcess = NULL;
 
@@ -27,10 +29,69 @@ void asmPush(const char *ins, ...) {
   asmPushArgs(ins, args);
   va_end(args);
 }
+static const char *asmKeywordForSize(size_t size, char *tmpBuff) {
+  const char *keyword = NULL;
+  switch (size) {
+  case DATA_SIZE_BYTE:
+    keyword = "db";
+    break;
+  case DATA_SIZE_WORD:
+    keyword = "dw";
+    break;
+  case DATA_SIZE_DWORD:
+    keyword = "dd";
+    break;
+  case DATA_SIZE_DDWORD:
+    keyword = "dq";
+    break;
+  default:
+    sprintf(tmpBuff, "times %ld db ", (unsigned long)size);
+    return tmpBuff;
+  }
+  strcpy(tmpBuff, keyword);
+  return tmpBuff;
+}
 struct node *codegenNextNode() {
   return vector_peek_ptr(currentProcess->nodeTreeVec);
 }
-void generateDataSectionPart(struct node *node) {}
+void codegenGlobalVariablePrimitive(struct node *node) {
+  char tmpBuff[256];
+  if (node->var.val != NULL) {
+    if (node->var.val->type == NODE_TYPE_STRING) {
+
+    } else {
+      // its a numeric value
+    }
+  }
+  asmPush("%s: %s 0", node->var.name,
+          asmKeywordForSize(variableSize(node), tmpBuff));
+}
+void codegenGenerateGlobalVariable(struct node *node) {
+  asmPush("; type: %s, name: %s\n", node->var.type.typeStr, node->var.name);
+  switch (node->var.type.type) {
+  case DATA_TYPE_VOID:
+  case DATA_TYPE_CHAR:
+  case DATA_TYPE_SHORT:
+  case DATA_TYPE_INTEGER:
+  case DATA_TYPE_LONG:
+    codegenGlobalVariablePrimitive(node);
+    break;
+  case DATA_TYPE_DOUBLE:
+  case DATA_TYPE_FLOAT:
+    compilerError(currentProcess,
+                  "Double and Float types are not supported \n");
+    break;
+  }
+}
+void generateDataSectionPart(struct node *node) {
+  switch (node->type) {
+  case NODE_TYPE_VARIABLE:
+    codegenGenerateGlobalVariable(node);
+    break;
+  default:
+    break;
+  }
+}
 void generateDataSection() {
   asmPush("section .data");
   struct node *node = codegenNextNode();
