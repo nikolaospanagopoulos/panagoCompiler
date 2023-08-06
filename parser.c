@@ -1505,5 +1505,6 @@ int parse(compileProcess *process) {
   if (!fixupsResolve(parserFixupSystem)) {
     compilerError(currentProcess, "There is an unresolved reference \n");
   }
+  // TODO: maybe free root scope
   return PARSE_ALL_OK;
 }
