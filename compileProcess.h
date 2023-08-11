@@ -42,6 +42,7 @@ typedef struct compileProcess {
     struct vector *table;
     struct vector *tables;
   } symbols;
+  struct codeGenerator *generator;
 } compileProcess;
 
 void freeCompileProcess(compileProcess *cp);

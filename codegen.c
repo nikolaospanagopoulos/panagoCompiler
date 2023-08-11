@@ -5,6 +5,7 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static struct compileProcess *currentProcess = NULL;
@@ -113,6 +114,89 @@ void codegenGenerateRoot() {
     codegenGenerateRootNode(node);
   }
 }
+struct codeGenerator *codegenNew(struct compileProcess *process) {
+  struct codeGenerator *generator = calloc(1, sizeof(struct codeGenerator));
+  generator->entryPoints = vector_create(sizeof(struct codegenEntryPoint *));
+  generator->exitPoints = vector_create(sizeof(struct codegenExitPoint *));
+  return generator;
+}
+void codeGeneratorRegisterExitPoint(int exitPointId) {
+  struct codeGenerator *gen = currentProcess->generator;
+  struct codegenExitPoint *exitPoint =
+      calloc(1, sizeof(struct codegenExitPoint));
+  exitPoint->id = exitPointId;
+  vector_push(gen->exitPoints, &exitPoint);
+}
+
+void codeGeneratorRegisterEntryPoint(int entryPointId) {
+  struct codeGenerator *gen = currentProcess->generator;
+  struct codegenEntryPoint *entryPoint =
+      calloc(1, sizeof(struct codegenEntryPoint));
+  entryPoint->id = entryPointId;
+  vector_push(gen->entryPoints, &entryPoint);
+}
+int codegenLabelCount() {
+  static int count = 0;
+  count++;
+  return count;
+}
+
+struct codegenExitPoint *codegenCurrentExitPoint() {
+  struct codeGenerator *gen = currentProcess->generator;
+  return vector_back_ptr_or_null(gen->exitPoints);
+}
+struct codegenEntryPoint *codegenCurrentEntryPoint() {
+  struct codeGenerator *gen = currentProcess->generator;
+  return vector_back_ptr_or_null(gen->entryPoints);
+}
+void codegenBeginExitPoint() {
+  int exitPointId = codegenLabelCount();
+  codeGeneratorRegisterExitPoint(exitPointId);
+}
+
+void codegenBeginEntryPoint() {
+  int entryPointId = codegenLabelCount();
+  codeGeneratorRegisterEntryPoint(entryPointId);
+  asmPush(".entry_point_%i:", entryPointId);
+}
+void codegenEndEntryPoint() {
+  struct codeGenerator *gen = currentProcess->generator;
+  struct codegenEntryPoint *entryPoint = codegenCurrentEntryPoint();
+  if (!entryPoint) {
+    compilerError(currentProcess, "no entry point to end \n");
+  }
+  free(entryPoint);
+  vector_pop(gen->entryPoints);
+}
+void codegenBeginEntryExitPoint() {
+  codegenBeginEntryPoint();
+  codegenBeginExitPoint();
+}
+
+void codegenEndExitPoint() {
+  struct codeGenerator *gen = currentProcess->generator;
+  struct codegenExitPoint *exitPoint = codegenCurrentExitPoint();
+  if (!exitPoint) {
+    compilerError(currentProcess, "exit point doesnt exist \n");
+  }
+  asmPush(".exit_point_%i:", exitPoint->id);
+  free(exitPoint);
+  vector_pop(gen->exitPoints);
+}
+void codegenEndEntryExitPoint() {
+  codegenEndEntryPoint();
+  codegenEndExitPoint();
+}
+void codegenGotoEntryPoint(struct node *node) {
+  struct codeGenerator *gen = currentProcess->generator;
+  struct codegenEntryPoint *entryPoint = codegenCurrentEntryPoint();
+  asmPush("jmp .entry_point_%i", entryPoint->id);
+}
+void codegenGoToExitPoint(struct node *node) {
+  struct codeGenerator *gen = currentProcess->generator;
+  struct codegenExitPoint *exitPoint = codegenCurrentExitPoint();
+  asmPush("jmp .exit_point_%i", exitPoint->id);
+}
 int codegen(struct compileProcess *process) {
   currentProcess = process;
   createRootScope(process);
@@ -123,5 +207,9 @@ int codegen(struct compileProcess *process) {
   codegenGenerateRoot();
   codegenFinishScope();
   generateRod();
+  codegenBeginEntryExitPoint();
+  codegenGoToExitPoint(NULL);
+  codegenGotoEntryPoint(NULL);
+  codegenEndEntryExitPoint();
   return CODEGEN_ALL_OK;
 }

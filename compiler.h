@@ -150,6 +150,17 @@ enum {
 };
 
 enum { FUNCTION_NODE_FLAG_IS_NATIVE = 0b00000001 };
+struct codegenEntryPoint {
+  int id;
+};
+struct codegenExitPoint {
+  int id;
+};
+
+struct codeGenerator {
+  struct vector *entryPoints;
+  struct vector *exitPoints;
+};
 
 int arrayTotalIndexes(struct datatype *dtype);
 size_t arrayBracketsCalcSize(struct datatype *dtype,
@@ -232,3 +243,4 @@ bool isArrayNode(struct node *node);
 bool nodeIsExpression(struct node *node, const char *op);
 bool isNodeAssignment(struct node *node);
 int codegen(struct compileProcess *process);
+struct codeGenerator *codegenNew(struct compileProcess *process);

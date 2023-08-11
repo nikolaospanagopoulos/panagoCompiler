@@ -47,6 +47,28 @@ void freeNode(struct node *node) {
     free(node);
   }
 }
+
+void freeVectorContentsVectors(struct vector *vecToFree) {
+  struct vector **data = (struct vector **)vector_peek(vecToFree);
+  while (data) {
+    vector_free(*data);
+    data = (struct vector **)vector_peek(vecToFree);
+  }
+}
+void freeVectorContents(struct vector *vecToFree) {
+  void **data = (void **)vector_peek(vecToFree);
+  while (data) {
+    free(*data);
+    data = (void **)vector_peek(vecToFree);
+  }
+}
+
+void codegenFree(compileProcess *process) {
+  vector_set_peek_pointer(process->generator->entryPoints, 0);
+  vector_free(process->generator->exitPoints);
+  vector_free(process->generator->entryPoints);
+  free(process->generator);
+}
 void freeCompileProcess(compileProcess *cp) {
   if (cp->cfile.fp) {
     fclose(cp->cfile.fp);
@@ -55,33 +77,20 @@ void freeCompileProcess(compileProcess *cp) {
     fclose(cp->outFile);
   }
 
-  vector_set_peek_pointer(cp->nodeGarbageVec, 0);
-  node **node = (struct node **)vector_peek(cp->nodeGarbageVec);
-  while (node) {
-
-    freeNode(*node);
-    node = (struct node **)vector_peek(cp->nodeGarbageVec);
-  }
-  vector_set_peek_pointer(cp->gb, 0);
-  void **data = (void **)vector_peek(cp->gb);
-  while (data) {
-    free(*data);
-    data = (void **)vector_peek(cp->gb);
-  }
+  freeVectorContents(cp->nodeGarbageVec);
+  freeVectorContents(cp->gb);
   vector_free(cp->nodeTreeVec);
   vector_free(cp->nodeVec);
   vector_free(cp->nodeGarbageVec);
   vector_set_peek_pointer(cp->gbForVectors, 0);
-  struct vector **vec = (struct vector **)vector_peek(cp->gbForVectors);
-  while (vec) {
-    vector_free(*vec);
-    vec = (struct vector **)vector_peek(cp->gbForVectors);
-  }
-
+  freeVectorContentsVectors(cp->gbForVectors);
   vector_free(cp->gbForVectors);
 
   scopeFreeRoot(cp);
   fixupSystemFree(cp->parserFixupSystem);
+
+  codegenFree(cp);
+
   vector_free(cp->gb);
 }
 
@@ -108,6 +117,7 @@ compileProcess *compileProcessCreate(const char *filename,
   process->nodeGarbageVec = vector_create(sizeof(struct node *));
   process->gb = vector_create(sizeof(void *));
   process->gbForVectors = vector_create(sizeof(struct vector *));
+  process->generator = codegenNew(process);
   symResolverInitialize(process);
   symresolverNewTable(process);
   return process;
