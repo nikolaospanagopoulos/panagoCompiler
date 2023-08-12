@@ -12,6 +12,7 @@ static struct compileProcess *currentProcess = NULL;
 
 void codegenNewScope(int flags) {}
 void codegenFinishScope() {}
+int codegenLabelCount();
 
 void asmPushArgs(const char *ins, va_list args) {
   va_list args2;
@@ -29,6 +30,18 @@ void asmPush(const char *ins, ...) {
   va_start(args, ins);
   asmPushArgs(ins, args);
   va_end(args);
+}
+void asmPushNoNl(const char *ins, ...) {
+  va_list args;
+  va_start(args, ins);
+  vfprintf(stdout, ins, args);
+  va_end(args);
+  if (currentProcess->outFile) {
+    va_list args;
+    va_start(args, ins);
+    vfprintf(currentProcess->outFile, ins, args);
+    va_end(args);
+  }
 }
 static const char *asmKeywordForSize(size_t size, char *tmpBuff) {
   const char *keyword = NULL;
@@ -101,7 +114,72 @@ void generateDataSection() {
     node = codegenNextNode();
   }
 }
-void codegenWriteStrings() {}
+const char *codegenGetLabelForString(const char *str) {
+  const char *result = NULL;
+  struct codeGenerator *gen = currentProcess->generator;
+  vector_set_peek_pointer(gen->stringTable, 0);
+  struct stringTableElement *current = vector_peek_ptr(gen->stringTable);
+  while (current) {
+    if (S_EQ(current->str, str)) {
+      result = current->label;
+      break;
+    }
+    current = vector_peek_ptr(gen->stringTable);
+  }
+  return result;
+}
+const char *codegenRegisterString(const char *str) {
+  const char *label = codegenGetLabelForString(str);
+  if (label) {
+    // already registered this string
+    return label;
+  }
+  struct stringTableElement *strElem =
+      calloc(1, sizeof(struct stringTableElement));
+  int labelId = codegenLabelCount();
+  sprintf((char *)strElem->label, "str_%i", labelId);
+  strElem->str = str;
+  vector_push(currentProcess->generator->stringTable, &strElem);
+  return strElem->label;
+}
+bool codegenWriteCharEscapedString(char c) {
+  const char *cout = NULL;
+  switch (c) {
+  case '\n':
+    cout = "10";
+    break;
+  case '\t':
+    cout = "9";
+    break;
+  }
+  if (cout) {
+    asmPushNoNl("%s, ", cout);
+  }
+  return cout != NULL;
+}
+void codegenWriteString(struct stringTableElement *element) {
+  asmPushNoNl("%s: db ", element->label);
+  size_t len = strlen(element->str);
+  for (int i = 0; i < len; i++) {
+    char c = element->str[i];
+    bool handled = codegenWriteCharEscapedString(c);
+    if (handled) {
+      continue;
+    }
+    asmPushNoNl("'%c', ", c);
+  }
+  asmPushNoNl("0");
+  asmPush("");
+}
+void codegenWriteStrings() {
+  struct codeGenerator *gen = currentProcess->generator;
+  vector_set_peek_pointer(gen->stringTable, 0);
+  struct stringTableElement *element = vector_peek_ptr(gen->stringTable);
+  while (element) {
+    codegenWriteString(element);
+    element = vector_peek_ptr(gen->stringTable);
+  }
+}
 void generateRod() {
   asmPush("section .rodata");
   codegenWriteStrings();
@@ -118,6 +196,7 @@ struct codeGenerator *codegenNew(struct compileProcess *process) {
   struct codeGenerator *generator = calloc(1, sizeof(struct codeGenerator));
   generator->entryPoints = vector_create(sizeof(struct codegenEntryPoint *));
   generator->exitPoints = vector_create(sizeof(struct codegenExitPoint *));
+  generator->stringTable = vector_create(sizeof(struct stringTableElement *));
   return generator;
 }
 void codeGeneratorRegisterExitPoint(int exitPointId) {
@@ -206,10 +285,11 @@ int codegen(struct compileProcess *process) {
   vector_set_peek_pointer(process->nodeTreeVec, 0);
   codegenGenerateRoot();
   codegenFinishScope();
+  codegenRegisterString("Hello world");
+  codegenRegisterString("Hello world");
+  codegenRegisterString("Hello world");
+  codegenRegisterString("Hello nikos");
+  // codegenRegisterString("efiejfiefj");
   generateRod();
-  codegenBeginEntryExitPoint();
-  codegenGoToExitPoint(NULL);
-  codegenGotoEntryPoint(NULL);
-  codegenEndEntryExitPoint();
   return CODEGEN_ALL_OK;
 }

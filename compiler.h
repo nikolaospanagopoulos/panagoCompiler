@@ -157,7 +157,12 @@ struct codegenExitPoint {
   int id;
 };
 
+struct stringTableElement {
+  const char *str;
+  const char label[50];
+};
 struct codeGenerator {
+  struct vector *stringTable;
   struct vector *entryPoints;
   struct vector *exitPoints;
 };

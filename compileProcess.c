@@ -56,6 +56,7 @@ void freeVectorContentsVectors(struct vector *vecToFree) {
   }
 }
 void freeVectorContents(struct vector *vecToFree) {
+  vector_set_peek_pointer(vecToFree, 0);
   void **data = (void **)vector_peek(vecToFree);
   while (data) {
     free(*data);
@@ -63,10 +64,24 @@ void freeVectorContents(struct vector *vecToFree) {
   }
 }
 
+/*
+void freeVectorStringTable(struct vector *strTable) {
+  struct stringTableElement **data =
+      (struct stringTableElement **)vector_peek(strTable);
+  while (data) {
+    free((char *)(*data)->str);
+    free((char *)(*data)->label);
+    free(*data);
+    data = (struct stringTableElement **)vector_peek(strTable);
+  }
+}
+*/
 void codegenFree(compileProcess *process) {
-  vector_set_peek_pointer(process->generator->entryPoints, 0);
   vector_free(process->generator->exitPoints);
   vector_free(process->generator->entryPoints);
+  // freeVectorStringTable(process->generator->stringTable);
+  freeVectorContents(process->generator->stringTable);
+  vector_free(process->generator->stringTable);
   free(process->generator);
 }
 void freeCompileProcess(compileProcess *cp) {
