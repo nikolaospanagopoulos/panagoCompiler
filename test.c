@@ -1,3 +1,1 @@
-int x;
-int y;
-char c;
+int x = 540;

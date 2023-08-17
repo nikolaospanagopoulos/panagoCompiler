@@ -74,11 +74,14 @@ void codegenGlobalVariablePrimitive(struct node *node) {
     if (node->var.val->type == NODE_TYPE_STRING) {
 
     } else {
-      // its a numeric value
+      asmPush("%s: %s %lld", node->var.name,
+              asmKeywordForSize(variableSize(node), tmpBuff),
+              node->var.val->llnum);
     }
+  } else {
+    asmPush("%s: %s 0", node->var.name,
+            asmKeywordForSize(variableSize(node), tmpBuff));
   }
-  asmPush("%s: %s 0", node->var.name,
-          asmKeywordForSize(variableSize(node), tmpBuff));
 }
 void codegenGenerateGlobalVariable(struct node *node) {
   asmPush("; type: %s, name: %s\n", node->var.type.typeStr, node->var.name);
@@ -285,11 +288,6 @@ int codegen(struct compileProcess *process) {
   vector_set_peek_pointer(process->nodeTreeVec, 0);
   codegenGenerateRoot();
   codegenFinishScope();
-  codegenRegisterString("Hello world");
-  codegenRegisterString("Hello world");
-  codegenRegisterString("Hello world");
-  codegenRegisterString("Hello nikos");
-  // codegenRegisterString("efiejfiefj");
   generateRod();
   return CODEGEN_ALL_OK;
 }
