@@ -13,6 +13,7 @@ static struct compileProcess *currentProcess = NULL;
 void codegenNewScope(int flags) {}
 void codegenFinishScope() {}
 int codegenLabelCount();
+const char *codegenRegisterString(const char *str);
 
 void asmPushArgs(const char *ins, va_list args) {
   va_list args2;
@@ -72,7 +73,9 @@ void codegenGlobalVariablePrimitive(struct node *node) {
   char tmpBuff[256];
   if (node->var.val != NULL) {
     if (node->var.val->type == NODE_TYPE_STRING) {
-
+      const char *label = codegenRegisterString(node->var.val->sval);
+      asmPush("%s: %s %s", node->var.name,
+              asmKeywordForSize(variableSize(node), tmpBuff), label);
     } else {
       asmPush("%s: %s %lld", node->var.name,
               asmKeywordForSize(variableSize(node), tmpBuff),

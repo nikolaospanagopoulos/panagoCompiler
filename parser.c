@@ -1415,6 +1415,7 @@ int parseKeyword(struct history *hs) {
   compilerError(currentProcess, "invalid keyword");
   return -1;
 }
+void parseString(history *hs) { parseSingleTokenToNode(); }
 int parseExpressionableSingle(history *hs) {
   token *token = tokenPeekNext();
   if (!token) {
@@ -1436,6 +1437,10 @@ int parseExpressionableSingle(history *hs) {
     break;
   case KEYWORD:
     parseKeyword(hs);
+    break;
+  case STRING:
+    parseString(hs);
+    res = 0;
     break;
   }
   return res;

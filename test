@@ -2,5 +2,9 @@ section .data
 ; type: int, name: x
 
 x: dd 540
+; type: char, name: name
+
+name: db str_1
 section .text
 section .rodata
+str_1: db 'n', 'i', 'k', 'o', 's', 0
