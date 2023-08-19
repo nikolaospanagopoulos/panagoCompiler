@@ -167,6 +167,33 @@ struct codeGenerator {
   struct vector *exitPoints;
 };
 
+enum {
+  STACK_FRAME_ELEMENT_TYPE_LOCAL_VAR,
+  STACK_FRAME_ELEMENT_TYPE_SAVED_REG,
+  STACK_FRAME_ELEMENT_TYPE_SAVED_BP,
+  STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE,
+  STACK_FRAME_ELEMENT_TYPE_UNKNOWN,
+};
+
+enum {
+  STACK_FRAME_ELEMENT_FLAG_IS_PUSHED_ADDRESS = 0b00000001,
+  STACK_FRAME_ELEMENT_FLAG_ELEMENT_NOT_FOUND = 0b00000010,
+  STACK_FRAME_ELEMENT_FLAG_IS_NUMERICAL = 0b00000100,
+  STACK_FRAME_ELEMENT_FLAG_HAS_DATATYPE = 0b00001000,
+};
+struct stackFrameData {
+  struct datatype dtype;
+};
+
+struct stackFrameElement {
+
+  int flags;
+  int type;
+  const char *name;
+  int offsetFromBasePtr;
+  struct stackFrameData data;
+};
+
 int arrayTotalIndexes(struct datatype *dtype);
 size_t arrayBracketsCalcSize(struct datatype *dtype,
                              struct arrayBrackets *brackets);
@@ -249,3 +276,17 @@ bool nodeIsExpression(struct node *node, const char *op);
 bool isNodeAssignment(struct node *node);
 int codegen(struct compileProcess *process);
 struct codeGenerator *codegenNew(struct compileProcess *process);
+void setCompileProcessForStackFrame(struct compileProcess *cp);
+void stackframePush(struct node *funcNode, struct stackFrameElement *element);
+void stackframeSub(struct node *funcNode, int type, const char *name,
+                   size_t amount);
+void stackFramePop(struct node *funcNode);
+void stackframeAdd(struct node *funcNode, int type, const char *name,
+                   size_t amount);
+void stackFrameAssertEmpty(struct node *funcNode);
+struct stackFrameElement *stackFrameBackExpect(struct node *funcNode,
+                                               int expectingType,
+                                               const char *expectingName);
+struct stackFrameElement *stackframePeek(struct node *funcNode);
+void stackFramePeekStart(struct node *funcNode);
+struct stackFrameElement *stackframeBack(struct node *funcNode);

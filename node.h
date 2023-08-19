@@ -135,6 +135,9 @@ typedef struct node {
       struct node *bodyN;
       // stack size for all vars inside function
       size_t stackSize;
+      struct stackFrame {
+        struct vector *elements;
+      } frame;
     } func;
     struct statement {
       struct returnStmt {

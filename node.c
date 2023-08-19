@@ -182,15 +182,22 @@ void makeExpParenthesisNode(struct node *expNode) {
 }
 void makeFunctionNode(struct datatype *retType, const char *name,
                       struct vector *arguments, struct node *bodyNode) {
-  nodeCreate(&(struct node){.type = NODE_TYPE_FUNCTION,
-                            .func.name = name,
-                            .func.args.vector = arguments,
-                            .func.bodyN = bodyNode,
-                            .func.rtype = *retType,
-                            .func.args.stackAddition = DATA_SIZE_DDWORD});
+  struct node *funcNode =
+      nodeCreate(&(struct node){.type = NODE_TYPE_FUNCTION,
+                                .func.name = name,
+                                .func.args.vector = arguments,
+                                .func.bodyN = bodyNode,
+                                .func.rtype = *retType,
+                                .func.args.stackAddition = DATA_SIZE_DDWORD});
+
+  funcNode->func.frame.elements =
+      vector_create(sizeof(struct stackFrameElement));
+
   if (arguments) {
     vector_push(garbageForVector, &arguments);
   }
+  // collect garbage
+  vector_push(garbageForVector, &funcNode->func.frame.elements);
 }
 bool nodeIsExpressionOrParentheses(struct node *node) {
   return node->type == NODE_TYPE_EXPRESSION_PARENTHESES ||

@@ -1,4 +1,4 @@
-OBJECTS= ./build/vector.o ./build/compiler.o ./build/compileProcess.o ./build/buffer.o ./build/lexProcess.o ./build/lexer.o ./build/token.o ./build/parser.o ./build/node.o ./build/expressionable.o ./build/datatype.o ./build/scope.o ./build/symresolver.o ./build/array.o ./build/helpers.o ./build/fixups.o ./build/codegen.o
+OBJECTS= ./build/vector.o ./build/compiler.o ./build/compileProcess.o ./build/buffer.o ./build/lexProcess.o ./build/lexer.o ./build/token.o ./build/parser.o ./build/node.o ./build/expressionable.o ./build/datatype.o ./build/scope.o ./build/symresolver.o ./build/array.o ./build/helpers.o ./build/fixups.o ./build/codegen.o ./build/stackframe.o
 
 all: ${OBJECTS}
 	gcc main.c ${OBJECTS}  -g -o ./bin/main
@@ -36,6 +36,8 @@ all: ${OBJECTS}
 	gcc ./fixup.c -o ./build/fixups.o -g -c
 ./build/codegen.o: ./codegen.c
 	gcc ./codegen.c -o ./build/codegen.o -g -c
+./build/stackframe.o: ./stackframe.c
+	gcc ./stackframe.c -o ./build/stackframe.o -g -c
 clean:
 	rm ./bin/main
 	rm -rf ${OBJECTS}
