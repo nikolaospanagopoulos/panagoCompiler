@@ -182,16 +182,197 @@ enum {
   STACK_FRAME_ELEMENT_FLAG_HAS_DATATYPE = 0b00001000,
 };
 struct stackFrameData {
+  // datatype that was pushed to the stack
   struct datatype dtype;
 };
 
 struct stackFrameElement {
-
+  // stack frame element flags
   int flags;
+  // type of the frame element
   int type;
+  // the name of the frame element. not a var name
   const char *name;
+  // the offset this element is on the base ptr
   int offsetFromBasePtr;
   struct stackFrameData data;
+};
+
+// Resolver
+enum {
+  RESOLVER_ENTITY_FLAG_IS_STACK = 0b00000001,
+  RESOLVER_ENTITY_FLAG_NO_MERGE_WITH_NEXT_ENTITY = 0b00000010,
+  RESOLVER_ENTITY_FLAG_NO_MERGE_WITH_LEFT_ENTITY = 0b00000100,
+  RESOLVER_ENTITY_FLAG_DO_INDIRECTION = 0b00001000,
+  RESOLVER_ENTITY_FLAG_JUST_USE_OFFSET = 0b00010000,
+  RESOLVER_ENTITY_FLAG_IS_POINTER_ARRAY_ENTITY = 0b00100000,
+  RESOLVER_ENTITY_FLAG_WAS_CASTED = 0b01000000,
+  RESOLVER_ENTITY_FLAG_USES_ARRAY_BRACKETS = 0b10000000
+};
+
+enum {
+  RESOLVER_ENTITY_TYPE_VARIABLE,
+  RESOLVER_ENTITY_TYPE_FUNCTION,
+  RESOLVER_ENTITY_TYPE_STRUCTURE,
+  RESOLVER_ENTITY_TYPE_FUNCTION_CALL,
+  RESOLVER_ENTITY_TYPE_ARRAY_BRACKET,
+  RESOLVER_ENTITY_TYPE_RULE,
+  RESOLVER_ENTITY_TYPE_GENERAL,
+  RESOLVER_ENTITY_TYPE_UNARY_GET_ADDRESS,
+  RESOLVER_ENTITY_TYPE_UNARY_INDIRECTION,
+  RESOLVER_ENTITY_TYPE_UNSUPPORTED,
+  RESOLVER_ENTITY_TYPE_CAST
+};
+
+enum { RESOLVER_SCOPE_FLAG_IS_STACK = 0b00000001 };
+
+struct resolverResult;
+struct resolverProcess;
+struct resolverScope;
+struct resolverEntity;
+typedef void *(*RESOLVER_NEW_ARRAY_BRACKET_ENTITY)(
+    struct resolverResult *result, struct node *arrayEntityNode);
+typedef void (*RESOLVER_DELETE_SCOPE)(struct resolverScope *scope);
+typedef void (*RESOLVER_DELETE_ENTITY)(struct resolverEntity *entity);
+typedef struct resolverEntity *(*RESOLVER_MERGE_ENTITIES)(
+    struct resolverProcess *process, struct resolverResult *result,
+    struct resolverEntity *leftEntity, struct resolverEntity *rightEntity);
+typedef void *(*RESOLVER_MAKE_PRIVATE)(struct resolverEntity *entity,
+                                       struct node *node, int offset,
+                                       struct resolverScope *scope);
+typedef void (*RESOLVER_SET_RESULT_BASE)(struct resolverResult *result,
+                                         struct resolverEntity *baseEntity);
+
+struct resolverCallbacks {
+  RESOLVER_NEW_ARRAY_BRACKET_ENTITY new_array_entity;
+  RESOLVER_DELETE_SCOPE delete_scope;
+  RESOLVER_DELETE_ENTITY delete_entity;
+  RESOLVER_MERGE_ENTITIES merge_entities;
+  RESOLVER_MAKE_PRIVATE make_private;
+  RESOLVER_SET_RESULT_BASE set_result_base;
+};
+
+struct compileProcess;
+struct resolverProcess {
+  struct resolverScopes {
+    struct resolverScope *root;
+    struct resolverScope *current;
+  } scope;
+  struct compileProcess *cmpProcess;
+  struct resolverCallbacks callbacks;
+};
+struct resolverScope {
+  int flags;
+  struct vector *entities;
+  struct resolverScope *next;
+  struct resolverScope *prev;
+};
+
+struct resolverArrayData {
+  // holds nodes of type resolver entity
+  struct vector *arrayEntities;
+};
+enum {
+  RESOLVER_RESULT_FLAG_FAILED = 0b00000001,
+  RESOLVER_RESULT_FLAG_RUNTIME_NEEDED_TO_FINISH_PATH = 0b00000010,
+  RESOLVER_RESULT_FLAG_PROCESSING_ARRAY_ENTITIES = 0b00000100,
+  RESOLVER_RESULT_FLAG_HAS_POINTER_ARRAY_ACCESS = 0b00001000,
+  RESOLVER_RESULT_FLAG_FIRST_ENTITY_LOAD_TO_EBX = 0b00010000,
+  RESOLVER_RESULT_FLAG_FIRST_ENTITY_PUSH_VALUE = 0b00100000,
+  RESOLVER_RESULT_FLAG_FINAL_INDIRECTION_REQUIRED_FOR_VALUE = 0b01000000,
+  RESOLVER_RESULT_FLAG_DOES_GET_ADDRESS = 0b10000000
+};
+struct resolverResult {
+  // the first entity in the resolver result
+  struct resolverEntity *firstEntityConst;
+
+  // this entity represents the variable at the  start of this expression
+  struct resolverEntity *identifier;
+
+  // equal to the last structure or union entity discovered
+  struct resolverEntity *lastStructUnionEntity;
+
+  struct resolverArrayData arrayData;
+
+  // The root entity
+  struct resolverEntity *entity;
+  struct resolverEntity *lastEntity;
+  int flags;
+
+  // total number of enitities
+  size_t count;
+
+  struct resolverResultBase {
+    //[ebp - 4] , [name + 4]
+    char address[60];
+    // EBP, global var
+    char baseAddress[60];
+    // 4 || -4
+    int offset;
+  } base;
+};
+struct resolverEntity {
+  int type;
+  int flags;
+
+  // the name of the resolved entity
+  const char *name;
+
+  // the offset from the base ptr
+  int offset;
+
+  // the node the entiry is relating to
+  struct node *node;
+
+  union {
+    struct resolverEntityVarData {
+      struct datatype dtype;
+      struct resolverArrayRuntime {
+        struct datatype dtype;
+        struct node *indexNode;
+        int multiplier;
+      } arrayRuntime;
+    } varData;
+    struct resolverArray {
+      struct datatype dtype;
+      int multiplier;
+      struct node *arrayIndexNode;
+      int index;
+    } array;
+    struct resolverEntityFunctionCallData {
+      struct vector *arguments;
+      // total size used by the function call;
+      size_t stackSize;
+    } funcCallData;
+    struct resolverEntityRule {
+      struct resolverEntityRuleLeft {
+        int flags;
+      } left;
+      struct resolverEntityRuleRight {
+        int flags;
+      } right;
+    } rule;
+    struct resolverIndirection {
+      // how much is the depth we need to find the value
+      int depth;
+    } indirection;
+  };
+  struct entityLastReolve {
+    struct node *referencingNode;
+
+  } lastResolve;
+  // datatype of the resolver entity
+  struct datatype dtype;
+  // the scope this entity belongs to
+  struct resolverScope *scope;
+  // the result of the resolution
+  struct resolverResult *result;
+  // the resolved process
+  struct resolverProcess *process;
+  void *privateData;
+  // linked list
+  struct resolverEntity *next;
+  struct resolverEntity *left;
 };
 
 int arrayTotalIndexes(struct datatype *dtype);
