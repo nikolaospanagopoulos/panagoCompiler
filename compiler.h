@@ -372,7 +372,7 @@ struct resolverEntity {
   void *privateData;
   // linked list
   struct resolverEntity *next;
-  struct resolverEntity *left;
+  struct resolverEntity *prev;
 };
 
 int arrayTotalIndexes(struct datatype *dtype);
@@ -471,3 +471,4 @@ struct stackFrameElement *stackFrameBackExpect(struct node *funcNode,
 struct stackFrameElement *stackframePeek(struct node *funcNode);
 void stackFramePeekStart(struct node *funcNode);
 struct stackFrameElement *stackframeBack(struct node *funcNode);
+void setCompileProcessForResolver(compileProcess *process);

@@ -1,4 +1,4 @@
-OBJECTS= ./build/vector.o ./build/compiler.o ./build/compileProcess.o ./build/buffer.o ./build/lexProcess.o ./build/lexer.o ./build/token.o ./build/parser.o ./build/node.o ./build/expressionable.o ./build/datatype.o ./build/scope.o ./build/symresolver.o ./build/array.o ./build/helpers.o ./build/fixups.o ./build/codegen.o ./build/stackframe.o
+OBJECTS= ./build/vector.o ./build/compiler.o ./build/compileProcess.o ./build/buffer.o ./build/lexProcess.o ./build/lexer.o ./build/token.o ./build/parser.o ./build/node.o ./build/expressionable.o ./build/datatype.o ./build/scope.o ./build/symresolver.o ./build/array.o ./build/helpers.o ./build/fixups.o ./build/codegen.o ./build/stackframe.o ./build/resolver.o
 
 all: ${OBJECTS}
 	gcc main.c ${OBJECTS}  -g -o ./bin/main
@@ -38,6 +38,8 @@ all: ${OBJECTS}
 	gcc ./codegen.c -o ./build/codegen.o -g -c
 ./build/stackframe.o: ./stackframe.c
 	gcc ./stackframe.c -o ./build/stackframe.o -g -c
+./build/resolver.o: ./resolver.c
+	gcc ./resolver.c -o ./build/resolver.o -g -c
 clean:
 	rm ./bin/main
 	rm -rf ${OBJECTS}
