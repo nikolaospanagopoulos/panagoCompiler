@@ -85,3 +85,104 @@ void resolverResultEntityPush(struct resolverResult *result,
   result->lastEntity = entity;
   result->count++;
 }
+struct resolverEntity *resolverResultPeek(struct resolverResult *result) {
+  return result->lastEntity;
+}
+
+struct resolverEntity *
+resolverResultPeekIgnoreRuleEntity(struct resolverResult *result) {
+  struct resolverEntity *entity = resolverResultPeek(result);
+  while (entity && entity->type == RESOLVER_ENTITY_TYPE_RULE) {
+    entity = entity->prev;
+  }
+  return entity;
+}
+
+struct resolverEntity *resolverResultPop(struct resolverResult *result) {
+  // TODO: check memory here
+  struct resolverEntity *entity = result->lastEntity;
+  if (!result->entity) {
+    return NULL;
+  }
+  if (result->entity == result->lastEntity) {
+    result->entity = result->lastEntity->prev;
+    result->lastEntity = result->lastEntity->prev;
+    result->count--;
+    goto out;
+  }
+  result->lastEntity = result->lastEntity->prev;
+  result->count--;
+
+out:
+  if (result->count == 0) {
+    result->firstEntityConst = NULL;
+    result->lastEntity = NULL;
+    result->entity = NULL;
+  }
+  entity->prev = NULL;
+  entity->next = NULL;
+  return entity;
+}
+struct vector *resolverArrayDataVec(struct resolverResult *result) {
+  return result->arrayData.arrayEntities;
+}
+
+struct compileProcess *resolverCompiler(struct resolverProcess *process) {
+  return process->cmpProcess;
+}
+
+struct resolverScope *resolverScopeCurrent(struct resolverProcess *process) {
+  return process->scope.current;
+}
+
+struct resolverScope *resolverScopeRoot(struct resolverProcess *process) {
+  return process->scope.root;
+}
+
+struct resolverScope *resolverNewScopeCreate() {
+  // TODO: cleanup needed ???
+  struct resolverScope *scope = calloc(1, sizeof(struct resolverScope));
+  scope->entities = vector_create(sizeof(struct resolverEntity));
+  return scope;
+}
+struct resolverScope *resolverNewScope(struct resolverProcess *resolver,
+                                       void *private, int flags) {
+  struct resolverScope *scope = resolverNewScopeCreate();
+  if (!scope) {
+    return NULL;
+  }
+  resolver->scope.current->next = scope;
+  scope->prev = resolver->scope.current;
+  resolver->scope.current = scope;
+  scope->privateData = private;
+  scope->flags = flags;
+  return scope;
+}
+void resolverFinishScope(struct resolverProcess *resolver) {
+  struct resolverScope *scope = resolver->scope.current;
+  resolver->scope.current = scope->prev;
+  resolver->callbacks.delete_scope(scope);
+  free(scope);
+}
+
+struct resolverProcess *
+resolverNewProcess(struct compileProcess *compiler,
+                   struct resolverCallbacks *callbacks) {
+  struct resolverProcess *process = calloc(1, sizeof(struct resolverProcess));
+  process->cmpProcess = compiler;
+  memcpy(&process->callbacks, callbacks, sizeof(process->callbacks));
+  process->scope.root = resolverNewScopeCreate();
+  process->scope.current = process->scope.root;
+  return process;
+}
+
+struct resolverEntity *resolverCreateNewEntity(struct resolverResult *result,
+                                               int type, void *private) {
+  struct resolverEntity *entity = calloc(1, sizeof(struct resolverEntity));
+  if (!entity) {
+    return NULL;
+  }
+  entity->type = type;
+  entity->privateData = private;
+  return entity;
+}

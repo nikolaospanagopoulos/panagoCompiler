@@ -266,6 +266,7 @@ struct resolverScope {
   struct vector *entities;
   struct resolverScope *next;
   struct resolverScope *prev;
+  void *privateData;
 };
 
 struct resolverArrayData {
