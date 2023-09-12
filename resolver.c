@@ -1,5 +1,6 @@
 #include "compileProcess.h"
 #include "compiler.h"
+#include "node.h"
 #include "vector.h"
 #include <stdlib.h>
 #include <string.h>
@@ -184,5 +185,48 @@ struct resolverEntity *resolverCreateNewEntity(struct resolverResult *result,
   }
   entity->type = type;
   entity->privateData = private;
+  return entity;
+}
+struct resolverEntity *
+resolverCreateNewEntityForUnsupportedNodes(struct resolverResult *result,
+                                           struct node *node) {
+  struct resolverEntity *entity =
+      // TODO: maybe cleanup
+      resolverCreateNewEntity(result, RESOLVER_ENTITY_TYPE_UNSUPPORTED, NULL);
+  if (!entity) {
+    return NULL;
+  }
+  entity->node = node;
+  entity->flags = RESOLVER_ENTITY_FLAG_NO_MERGE_WITH_LEFT_ENTITY |
+                  RESOLVER_ENTITY_FLAG_NO_MERGE_WITH_NEXT_ENTITY;
+  return entity;
+}
+struct resolverEntity *resolverCreateNewEntityForArrayBracket(
+    struct resolverResult *result, struct resolverProcess *process,
+    struct node *node, struct node *arrayIndexNode, int index,
+    struct datatype *dtype, void *privateData, struct resolverScope *scope) {
+
+  struct resolverEntity *entity = resolverCreateNewEntity(
+      result, RESOLVER_ENTITY_TYPE_ARRAY_BRACKET, privateData);
+
+  if (!entity) {
+    return NULL;
+  }
+
+  entity->scope = scope;
+  if (!entity->scope) {
+    compilerError(cp, "Resolver entity scope error\n");
+  }
+  entity->name = NULL;
+  entity->dtype = *dtype;
+  entity->node = node;
+  entity->array.index = index;
+  entity->array.dtype = *dtype;
+  entity->array.arrayIndexNode = arrayIndexNode;
+  int arrayIndexVal = 1;
+  if (arrayIndexNode->type == NODE_TYPE_NUMBER) {
+    arrayIndexVal = arrayIndexNode->llnum;
+  }
+  // entity->offset = arrayOffset(dtype, index, arrayIndexVal);
   return entity;
 }

@@ -336,7 +336,6 @@ struct resolverEntity {
     } varData;
     struct resolverArray {
       struct datatype dtype;
-      int multiplier;
       struct node *arrayIndexNode;
       int index;
     } array;
@@ -473,3 +472,5 @@ struct stackFrameElement *stackframePeek(struct node *funcNode);
 void stackFramePeekStart(struct node *funcNode);
 struct stackFrameElement *stackframeBack(struct node *funcNode);
 void setCompileProcessForResolver(compileProcess *process);
+int arrayMultiplier(struct datatype *dtype, int index, int indexValue);
+int arrayOffset(struct datatype *dtype, int index, int indexValue);
