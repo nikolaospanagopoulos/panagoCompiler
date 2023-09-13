@@ -230,3 +230,94 @@ struct resolverEntity *resolverCreateNewEntityForArrayBracket(
   // entity->offset = arrayOffset(dtype, index, arrayIndexVal);
   return entity;
 }
+struct resolverEntity *resolverCreateNewEntityForMergedArrayBracket(
+    struct resolverResult *result, struct resolverProcess *process,
+    struct node *node, struct node *arrayIndexNode, int index,
+    struct datatype *dtype, void *privateData, struct resolverScope *scope) {
+
+  struct resolverEntity *entity = resolverCreateNewEntity(
+      result, RESOLVER_ENTITY_TYPE_ARRAY_BRACKET, privateData);
+  if (!entity) {
+    return NULL;
+  }
+  entity->scope = scope;
+  if (!entity->scope) {
+    compilerError(cp, "No entity scope for the resolver \n");
+  }
+  entity->name = NULL;
+  entity->dtype = *dtype;
+  entity->node = node;
+  entity->array.index = index;
+  entity->array.dtype = *dtype;
+  entity->array.arrayIndexNode = arrayIndexNode;
+  return entity;
+}
+
+struct resolverEntity *
+resolverCreateNewUnknownEntity(struct resolverProcess *process,
+                               struct resolverResult *result,
+                               struct datatype *dtype, struct node *node,
+                               struct resolverScope *scope, int offset) {
+  struct resolverEntity *entity =
+      resolverCreateNewEntity(result, RESOLVER_ENTITY_TYPE_GENERAL, NULL);
+  if (!entity) {
+    return NULL;
+  }
+  entity->flags |= RESOLVER_ENTITY_FLAG_NO_MERGE_WITH_NEXT_ENTITY |
+                   RESOLVER_ENTITY_FLAG_NO_MERGE_WITH_LEFT_ENTITY;
+
+  entity->scope = scope;
+  entity->dtype = *dtype;
+  entity->node = node;
+  entity->offset = offset;
+  return entity;
+}
+struct resolverEntity *resolverCreateNewUnaryIndirectionEntity(
+    struct resolverProcess *process, struct resolverResult *result,
+    struct node *node, int indirectionDepth) {
+
+  struct resolverEntity *entity = resolverCreateNewEntity(
+      result, RESOLVER_ENTITY_TYPE_UNARY_INDIRECTION, NULL);
+  if (!entity) {
+    return NULL;
+  }
+  entity->flags = RESOLVER_ENTITY_FLAG_NO_MERGE_WITH_LEFT_ENTITY |
+                  RESOLVER_ENTITY_FLAG_NO_MERGE_WITH_NEXT_ENTITY;
+
+  entity->node = node;
+  entity->indirection.depth = indirectionDepth;
+  return entity;
+}
+struct resolverEntity *resolverCreateNewUnaryGetAddressEntity(
+    struct resolverProcess *process, struct resolverResult *result,
+    struct datatype *dtype, struct node *node, struct resolverScope *scope,
+    int offset) {
+
+  struct resolverEntity *entity = resolverCreateNewEntity(
+      result, RESOLVER_ENTITY_TYPE_UNARY_GET_ADDRESS, NULL);
+  if (!entity) {
+    return NULL;
+  }
+  entity->flags = RESOLVER_ENTITY_FLAG_NO_MERGE_WITH_LEFT_ENTITY |
+                  RESOLVER_ENTITY_FLAG_NO_MERGE_WITH_NEXT_ENTITY;
+  entity->node = node;
+  entity->scope = scope;
+  entity->dtype = *dtype;
+  entity->dtype.flags |= DATATYPE_FLAG_IS_POINTER;
+  entity->dtype.ptrDepth++;
+  return entity;
+}
+struct resolverEntity *
+resolverCreateNewCastEntity(struct resolverProcess *process,
+                            struct resolverScope *scope,
+                            struct datatype *castDtype) {
+  struct resolverEntity *entity =
+      resolverCreateNewEntity(NULL, RESOLVER_ENTITY_TYPE_CAST, NULL);
+  entity->flags = RESOLVER_ENTITY_FLAG_NO_MERGE_WITH_LEFT_ENTITY |
+                  RESOLVER_ENTITY_FLAG_NO_MERGE_WITH_NEXT_ENTITY;
+  entity->scope = scope;
+  entity->dtype = *castDtype;
+  return entity;
+}
+
+// struct resolverEntity *resolverCreateNewEntityForVarNodeCustomScope
