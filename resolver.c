@@ -313,6 +313,11 @@ resolverCreateNewCastEntity(struct resolverProcess *process,
                             struct datatype *castDtype) {
   struct resolverEntity *entity =
       resolverCreateNewEntity(NULL, RESOLVER_ENTITY_TYPE_CAST, NULL);
+
+  if (!entity) {
+    return NULL;
+  }
+
   entity->flags = RESOLVER_ENTITY_FLAG_NO_MERGE_WITH_LEFT_ENTITY |
                   RESOLVER_ENTITY_FLAG_NO_MERGE_WITH_NEXT_ENTITY;
   entity->scope = scope;
@@ -320,4 +325,56 @@ resolverCreateNewCastEntity(struct resolverProcess *process,
   return entity;
 }
 
-// struct resolverEntity *resolverCreateNewEntityForVarNodeCustomScope
+struct resolverEntity *resolverCreateNewEntityForVarNodeCustomScope(
+    struct resolverProcess *process, struct node *varNode, void *privateData,
+    struct resolverScope *scope, int offset) {
+  if (varNode->type != NODE_TYPE_VARIABLE) {
+    compilerError(cp, "Not a variable \n");
+  }
+  struct resolverEntity *entity =
+      resolverCreateNewEntity(NULL, NODE_TYPE_VARIABLE, privateData);
+  if (!entity) {
+    return NULL;
+  }
+  entity->scope = scope;
+  if (!entity->scope) {
+    compilerError(cp, "No entity scope");
+  }
+  entity->dtype = varNode->var.type;
+  entity->node = varNode;
+  entity->name = varNode->var.name;
+  entity->offset = offset;
+  return entity;
+}
+struct resolverEntity *
+resolverCreateNewEntityForVarNode(struct resolverProcess *process,
+                                  struct node *varNode, void *privateData,
+                                  int offset) {
+  return resolverCreateNewEntityForVarNodeCustomScope(
+      process, varNode, privateData, resolverScopeCurrent(process), offset);
+}
+struct resolverEntity *resolverCreateNewEntityForVarNodeNoPush(
+    struct resolverProcess *process, struct node *varNode, void *privateData,
+    int offset, struct resolverScope *scope) {
+  struct resolverEntity *entity = resolverCreateNewEntityForVarNodeCustomScope(
+      process, varNode, privateData, scope, offset);
+  if (!entity) {
+    return NULL;
+  }
+  if (scope->flags & RESOLVER_SCOPE_FLAG_IS_STACK) {
+    entity->flags |= RESOLVER_SCOPE_FLAG_IS_STACK;
+  }
+  return entity;
+}
+struct resolverEntity *
+resolverNewEntityForVarNode(struct resolverProcess *process,
+                            struct node *varNode, void *privateData,
+                            int offset) {
+  struct resolverEntity *entity = resolverCreateNewEntityForVarNodeNoPush(
+      process, varNode, privateData, offset, resolverScopeCurrent(process));
+  if (!entity) {
+    return NULL;
+  }
+  vector_push(process->scope.current->entities, &entity);
+  return entity;
+}
