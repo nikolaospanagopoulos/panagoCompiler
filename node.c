@@ -291,3 +291,6 @@ bool isNodeAssignment(struct node *node) {
          S_EQ(node->exp.op, "-=") || S_EQ(node->exp.op, "/=") ||
          S_EQ(node->exp.op, "*=");
 }
+bool nodeIsStructOrUnion(struct node *node) {
+  return node->type == NODE_TYPE_STRUCT || node->type == NODE_TYPE_UNION;
+}

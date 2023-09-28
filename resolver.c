@@ -2,11 +2,11 @@
 #include "compiler.h"
 #include "node.h"
 #include "vector.h"
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 
 static struct compileProcess *cp;
-
 void setCompileProcessForResolver(compileProcess *process) { cp = process; }
 
 bool resolverResultFailed(struct resolverResult *result) {

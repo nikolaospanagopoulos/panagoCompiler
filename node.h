@@ -197,3 +197,4 @@ typedef struct node {
     void *any;
   };
 } node;
+bool nodeIsStructOrUnion(struct node *node);

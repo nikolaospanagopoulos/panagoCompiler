@@ -474,3 +474,11 @@ struct stackFrameElement *stackframeBack(struct node *funcNode);
 void setCompileProcessForResolver(compileProcess *process);
 int arrayMultiplier(struct datatype *dtype, int index, int indexValue);
 int arrayOffset(struct datatype *dtype, int index, int indexValue);
+
+int structOffset(struct compileProcess *process, const char *structName,
+                 const char *varName, struct node **varNodeOut, int lastPos,
+                 int flags);
+enum {
+  STRUCT_ACCESS_BACKWARDS = 0b00000001,
+  STRUCT_STOP_AT_PTR_ACCESS = 0b00000010
+};

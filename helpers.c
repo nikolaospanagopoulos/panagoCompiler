@@ -1,9 +1,11 @@
 #include "compileProcess.h"
 #include "compiler.h"
 #include "node.h"
+#include "position.h"
 #include "vector.h"
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 static struct compileProcess *process;
 static struct lexProcess *lexPr;
 
@@ -107,4 +109,59 @@ int arrayOffset(struct datatype *dtype, int index, int indexValue) {
     return indexValue * datatypeElementSize(dtype);
   }
   return arrayMultiplier(dtype, index, indexValue) * datatypeElementSize(dtype);
+}
+struct node *bodyLargestVarNode(struct node *bodyNode) {
+  if (!bodyNode) {
+    return NULL;
+  }
+  if (bodyNode->type != NODE_TYPE_BODY) {
+    return NULL;
+  }
+  return bodyNode->body.largestVarNode;
+}
+struct node *variableStructOrUnionLargestVarNode(struct node *varNode) {
+  return bodyLargestVarNode(variableStructOrUnionBodyNode(varNode));
+}
+int structOffset(struct compileProcess *process, const char *structName,
+                 const char *varName, struct node **varNodeOut, int lastPos,
+                 int flags) {
+  struct symbol *structSym = symresolverGetSymbol(process, structName);
+  if (!structSym || structSym->type != SYMBOL_TYPE_NODE) {
+    compilerError(process, "Symbol doesnt exist \n");
+  }
+  struct node *node = structSym->data;
+  if (!nodeIsStructOrUnion(node)) {
+    compilerError(process, "Not a struct or a union \n");
+  }
+  struct vector *structVarsVec = node->_struct.body_n->body.statements;
+  vector_set_peek_pointer(structVarsVec, 0);
+  if (flags & STRUCT_ACCESS_BACKWARDS) {
+    vector_set_peek_pointer_end(structVarsVec);
+    vector_set_flag(structVarsVec, VECTOR_FLAG_PEEK_DECREMENT);
+  }
+  struct node *varNodeCur = variableNode(vector_peek_ptr(structVarsVec));
+  struct node *varNodeLast = NULL;
+  int position = lastPos;
+  *varNodeOut = NULL;
+  while (varNodeCur) {
+    *varNodeOut = varNodeCur;
+    if (varNodeLast) {
+      position += variableSize(varNodeLast);
+      if (isPrimitive(varNodeCur)) {
+        position = alignValueAsPositive(position, varNodeCur->var.type.size);
+      } else {
+        position = alignValueAsPositive(
+            position,
+            variableStructOrUnionLargestVarNode(varNodeCur)->var.type.size);
+      }
+    }
+
+    if (S_EQ(varNodeCur->var.name, varName)) {
+      break;
+    }
+    varNodeLast = varNodeCur;
+    varNodeCur = variableNode(vector_peek_ptr(structVarsVec));
+  }
+  vector_unset_flag(structVarsVec, VECTOR_FLAG_PEEK_DECREMENT);
+  return position;
 }
