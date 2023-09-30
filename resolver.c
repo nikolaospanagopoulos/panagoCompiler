@@ -378,3 +378,84 @@ resolverNewEntityForVarNode(struct resolverProcess *process,
   vector_push(process->scope.current->entities, &entity);
   return entity;
 }
+void resolverNewEntityForRule(struct resolverProcess *process,
+                              struct resolverResult *result,
+                              struct resolverEntityRule *rule) {
+  struct resolverEntity *entityRule =
+      resolverCreateNewEntity(result, RESOLVER_ENTITY_TYPE_RULE, NULL);
+  entityRule->rule = *rule;
+  resolverResultEntityPush(result, entityRule);
+}
+struct resolverEntity *resolverMakeEntity(struct resolverProcess *process,
+                                          struct resolverResult *result,
+                                          struct datatype *customDtype,
+                                          struct node *node,
+                                          struct resolverEntity *guidedEntity,
+                                          struct resolverScope *scope) {
+  struct resolverEntity *entity = NULL;
+  int offset = guidedEntity->offset;
+  int flags = guidedEntity->flags;
+  switch (node->type) {
+  case NODE_TYPE_VARIABLE:
+    entity = resolverCreateNewEntityForVarNodeNoPush(process, node, NULL,
+                                                     offset, scope);
+    break;
+  default:
+    entity = resolverCreateNewUnknownEntity(process, result, customDtype, node,
+                                            scope, offset);
+  }
+  if (entity) {
+    entity->flags |= flags;
+    if (customDtype) {
+      entity->dtype = *customDtype;
+    }
+    entity->privateData =
+        process->callbacks.make_private(entity, node, offset, scope);
+  }
+  return entity;
+}
+struct resolverEntity *resolverCreateNewEntityForFunctionCall(
+    struct resolverResult *result, struct resolverProcess *process,
+    struct resolverEntity *leftOperandEntity, void *privateData) {
+  struct resolverEntity *entity = resolverCreateNewEntity(
+      result, RESOLVER_ENTITY_TYPE_FUNCTION_CALL, privateData);
+  if (!entity) {
+    return NULL;
+  }
+  entity->dtype = leftOperandEntity->dtype;
+  entity->funcCallData.arguments = vector_create(sizeof(struct node *));
+  return entity;
+}
+struct resolverEntity *resolverRegisterFunction(struct resolverProcess *process,
+                                                struct node *funcNode,
+                                                void *privateData) {
+  struct resolverEntity *entity =
+      resolverCreateNewEntity(NULL, RESOLVER_ENTITY_TYPE_FUNCTION, privateData);
+
+  if (!entity) {
+    return NULL;
+  }
+  entity->name = funcNode->func.name;
+  entity->node = funcNode;
+  entity->dtype = funcNode->func.rtype;
+  entity->scope = resolverScopeCurrent(process);
+  vector_push(process->scope.root->entities, &entity);
+  return entity;
+}
+/*
+struct resolverEntity *resolverGetEntityInScopeWithEntityType(
+    struct resolverResult *result, struct resolverProcess *rprocess,
+    struct resolverScope *rscope, const char *entityName, int entityType) {
+  if (result && result->lastStructUnionEntity) {
+    struct resolverScope *scope = result->lastStructUnionEntity->scope;
+    struct node *outNode = NULL;
+    struct datatype *nodeVarDatatype = &result->lastStructUnionEntity->dtype;
+    int offset =
+        structOffset(resolverCompiler(rprocess), nodeVarDatatype->typeStr,
+                     entityName, &outNode, 0, 0);
+        if(nodeVarDatatype->type == DATA_TYPE_UNION){
+                offset = 0;
+        }
+  }
+}
+*/
