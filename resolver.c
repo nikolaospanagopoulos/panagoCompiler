@@ -442,7 +442,6 @@ struct resolverEntity *resolverRegisterFunction(struct resolverProcess *process,
   vector_push(process->scope.root->entities, &entity);
   return entity;
 }
-/*
 struct resolverEntity *resolverGetEntityInScopeWithEntityType(
     struct resolverResult *result, struct resolverProcess *rprocess,
     struct resolverScope *rscope, const char *entityName, int entityType) {
@@ -453,9 +452,85 @@ struct resolverEntity *resolverGetEntityInScopeWithEntityType(
     int offset =
         structOffset(resolverCompiler(rprocess), nodeVarDatatype->typeStr,
                      entityName, &outNode, 0, 0);
-        if(nodeVarDatatype->type == DATA_TYPE_UNION){
-                offset = 0;
-        }
+    if (nodeVarDatatype->type == DATA_TYPE_UNION) {
+      offset = 0;
+    }
+    return resolverMakeEntity(
+        rprocess, result, NULL, outNode,
+        &(struct resolverEntity){.type = RESOLVER_ENTITY_TYPE_VARIABLE,
+                                 .offset = offset},
+        scope);
   }
+  vector_set_peek_pointer_end(rscope->entities);
+  vector_set_flag(rscope->entities, VECTOR_FLAG_PEEK_DECREMENT);
+  struct resolverEntity *current = vector_peek_ptr(rscope->entities);
+  while (current) {
+    if (entityType != -1 && current->type != entityType) {
+      current = vector_peek_ptr(rscope->entities);
+      continue;
+    }
+    if (S_EQ(current->name, entityName)) {
+      break;
+    }
+    current = vector_peek_ptr(rscope->entities);
+  }
+  return current;
 }
-*/
+struct resolverEntity *
+resolverGetEntityForType(struct resolverResult *result,
+                         struct resolverProcess *rprocess,
+                         const char *entityName, int entityType) {
+
+  struct resolverScope *scope = rprocess->scope.current;
+  struct resolverEntity *entity = NULL;
+  while (scope) {
+    entity = resolverGetEntityInScopeWithEntityType(result, rprocess, scope,
+                                                    entityName, entityType);
+    if (entity) {
+      break;
+    }
+
+    scope = scope->prev;
+  }
+  if (entity) {
+    memset(&entity->lastResolve, 0, sizeof(entity->lastResolve));
+  }
+  return entity;
+}
+struct resolverEntity *resolverGetEntity(struct resolverResult *result,
+                                         struct resolverProcess *process,
+                                         const char *entityName) {
+  return resolverGetEntityForType(result, process, entityName, -1);
+}
+
+struct resolverEntity *resolverGetEntityInScope(struct resolverResult *result,
+                                                struct resolverProcess *process,
+                                                struct resolverScope *scope,
+                                                const char *entityName) {
+  return resolverGetEntityInScopeWithEntityType(result, process, scope,
+                                                entityName, -1);
+}
+
+struct resolverEntity *resolverGetVariable(struct resolverResult *result,
+                                           struct resolverProcess *process,
+                                           const char *varName) {
+  return resolverGetEntityForType(result, process, varName,
+                                  RESOLVER_ENTITY_TYPE_VARIABLE);
+}
+
+struct resolverEntity *
+resolverGetFunctionInScope(struct resolverResult *result,
+                           struct resolverProcess *process,
+                           const char *funcName, struct resolverScope *scope) {
+  return resolverGetEntityForType(result, process, funcName,
+                                  RESOLVER_ENTITY_TYPE_FUNCTION);
+}
+
+struct resolverEntity *resolverGetFunction(struct resolverResult *result,
+                                           struct resolverProcess *process,
+                                           const char *funcName) {
+  struct resolverEntity *entity = NULL;
+  struct resolverScope *scope = process->scope.root;
+  entity = resolverGetFunctionInScope(result, process, funcName, scope);
+  return entity;
+}

@@ -357,7 +357,7 @@ struct resolverEntity {
       int depth;
     } indirection;
   };
-  struct entityLastReolve {
+  struct entityLastResolve {
     struct node *referencingNode;
 
   } lastResolve;
