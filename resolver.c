@@ -534,3 +534,74 @@ struct resolverEntity *resolverGetFunction(struct resolverResult *result,
   entity = resolverGetFunctionInScope(result, process, funcName, scope);
   return entity;
 }
+
+struct resolverEntity *resolverFollowForName(struct resolverProcess *resolver,
+                                             const char *name,
+                                             struct resolverResult *result) {
+  struct resolverEntity *entity =
+      resolverEntityClone(resolverGetEntity(result, resolver, name));
+  if (!entity) {
+    return NULL;
+  }
+  resolverResultEntityPush(result, entity);
+  if (!result->identifier) {
+    result->identifier = entity;
+  }
+  if ((entity->type == RESOLVER_ENTITY_TYPE_VARIABLE &&
+       dataTypeIsStructOrUnion(&entity->varData.dtype)) ||
+
+      (entity->type == RESOLVER_ENTITY_TYPE_FUNCTION &&
+       dataTypeIsStructOrUnion(&entity->dtype))) {
+    result->lastStructUnionEntity = entity;
+  }
+  return entity;
+}
+struct resolverEntity *
+resolverFollowIdentifier(struct resolverProcess *resolver, struct node *node,
+                         struct resolverResult *result) {
+  struct resolverEntity *entity =
+      resolverFollowForName(resolver, node->sval, result);
+  if (entity) {
+    entity->lastResolve.referencingNode = node;
+  }
+  return entity;
+}
+struct resolverEntity *
+resolverFollowPartReturnEntity(struct resolverProcess *process,
+                               struct node *node,
+                               struct resolverResult *result) {
+  struct resolverEntity *entity = NULL;
+  switch (node->type) {
+  case NODE_TYPE_IDENTIFIER:
+    entity = resolverFollowIdentifier(process, node, result);
+    break;
+  }
+}
+void resolverFollowPart(struct resolverProcess *resolver, struct node *node,
+                        struct resolverResult *result) {
+  resolverFollowPartReturnEntity(resolver, node, result);
+}
+void resolverMergeCompileTimes(struct resolverProcess *resolver,
+                               struct resolverResult *result) {}
+void resolverFinalizeResult(struct resolverProcess *resolver,
+                            struct resolverResult *result) {}
+void resolverExecuteRules(struct resolverProcess *resolver,
+                          struct resolverResult *result) {}
+struct resolverResult *resolverFollow(struct resolverProcess *resolver,
+                                      struct node *node) {
+  if (!resolver) {
+    compilerError(cp, "Resolver doesn't exist \n");
+  }
+  if (!node) {
+    compilerError(cp, "Node to resolve doesn't exist\n");
+  }
+  struct resolverResult *result = resolverNewResult(resolver);
+  resolverFollowPart(resolver, node, result);
+  if (!resolverResultEntityRoot(result)) {
+    result->flags |= RESOLVER_RESULT_FLAG_FAILED;
+  }
+  resolverExecuteRules(resolver, result);
+  resolverMergeCompileTimes(resolver, result);
+  resolverFinalizeResult(resolver, result);
+  return result;
+}
