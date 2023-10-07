@@ -165,3 +165,18 @@ int structOffset(struct compileProcess *process, const char *structName,
   vector_unset_flag(structVarsVec, VECTOR_FLAG_PEEK_DECREMENT);
   return position;
 }
+bool isAccessOperator(const char *op) {
+  return S_EQ(op, "->") || S_EQ(op, ".");
+}
+bool isAccessNode(struct node *node) {
+  return node->type == NODE_TYPE_EXPRESSION && isAccessOperator(node->exp.op);
+}
+bool isParenthesesOperator(const char *op) { return S_EQ(op, "()"); }
+
+bool isParenthesesNode(struct node *node) {
+  return node->type == NODE_TYPE_EXPRESSION &&
+         isParenthesesOperator(node->exp.op);
+}
+bool isAccessNodeWithOp(struct node *node, const char *op) {
+  return isAccessNode(node) && S_EQ(node->exp.op, op);
+}

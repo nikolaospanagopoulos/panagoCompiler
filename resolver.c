@@ -8,7 +8,12 @@
 
 static struct compileProcess *cp;
 void setCompileProcessForResolver(compileProcess *process) { cp = process; }
+void resolverFollowPart(struct resolverProcess *resolver, struct node *node,
+                        struct resolverResult *result);
 
+void resolverNewEntityForRule(struct resolverProcess *process,
+                              struct resolverResult *result,
+                              struct resolverEntityRule *rule);
 bool resolverResultFailed(struct resolverResult *result) {
   return result->flags & RESOLVER_RESULT_FLAG_FAILED;
 }
@@ -566,6 +571,39 @@ resolverFollowIdentifier(struct resolverProcess *resolver, struct node *node,
   }
   return entity;
 }
+struct resolverEntity *resolverFollowVariable(struct resolverProcess *process,
+                                              struct node *node,
+                                              struct resolverResult *result) {
+  struct resolverEntity *entity =
+      resolverFollowForName(process, node->var.name, result);
+  return entity;
+}
+struct resolverEntity *
+resolverFollowStructExpression(struct resolverProcess *resolver,
+                               struct node *node,
+                               struct resolverResult *result) {
+  struct resolverEntity *resultEntity = NULL;
+  resolverFollowPart(resolver, node->exp.left, result);
+  struct resolverEntity *leftEntity = resolverResultPeek(result);
+  struct resolverEntityRule rule = {};
+  if (isAccessNodeWithOp(node, "->")) {
+    rule.left.flags = RESOLVER_ENTITY_FLAG_NO_MERGE_WITH_NEXT_ENTITY;
+    if (leftEntity->type != RESOLVER_ENTITY_TYPE_FUNCTION_CALL) {
+      rule.right.flags = RESOLVER_ENTITY_FLAG_DO_INDIRECTION;
+    }
+  }
+  resolverNewEntityForRule(resolver, result, &rule);
+  resolverFollowPart(resolver, node->exp.right, result);
+  return NULL;
+}
+struct resolverEntity *resolverFollowExp(struct resolverProcess *resolver,
+                                         struct node *node,
+                                         struct resolverResult *result) {
+  struct resolverEntity *entity = NULL;
+  if (isAccessNode(node)) {
+    entity = resolverFollowStructExpression(resolver, node, result);
+  }
+}
 struct resolverEntity *
 resolverFollowPartReturnEntity(struct resolverProcess *process,
                                struct node *node,
@@ -574,6 +612,9 @@ resolverFollowPartReturnEntity(struct resolverProcess *process,
   switch (node->type) {
   case NODE_TYPE_IDENTIFIER:
     entity = resolverFollowIdentifier(process, node, result);
+    break;
+  case NODE_TYPE_VARIABLE:
+    entity = resolverFollowVariable(process, node, result);
     break;
   }
 }

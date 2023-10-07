@@ -482,3 +482,9 @@ enum {
   STRUCT_ACCESS_BACKWARDS = 0b00000001,
   STRUCT_STOP_AT_PTR_ACCESS = 0b00000010
 };
+bool isAccessOperator(const char *op);
+bool isAccessNode(struct node *node);
+bool isParenthesesOperator(const char *op);
+
+bool isParenthesesNode(struct node *node);
+bool isAccessNodeWithOp(struct node *node, const char *op);
