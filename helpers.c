@@ -180,3 +180,8 @@ bool isParenthesesNode(struct node *node) {
 bool isAccessNodeWithOp(struct node *node, const char *op) {
   return isAccessNode(node) && S_EQ(node->exp.op, op);
 }
+bool isArgumentOperator(const char *op) { return S_EQ(op, ","); }
+
+bool isArgumentNode(struct node *node) {
+  return node->type == NODE_TYPE_EXPRESSION && isArgumentOperator(node->exp.op);
+}

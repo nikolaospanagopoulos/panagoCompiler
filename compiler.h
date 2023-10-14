@@ -488,3 +488,4 @@ bool isParenthesesOperator(const char *op);
 
 bool isParenthesesNode(struct node *node);
 bool isAccessNodeWithOp(struct node *node, const char *op);
+bool isArgumentNode(struct node *node);

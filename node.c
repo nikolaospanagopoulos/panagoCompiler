@@ -294,3 +294,7 @@ bool isNodeAssignment(struct node *node) {
 bool nodeIsStructOrUnion(struct node *node) {
   return node->type == NODE_TYPE_STRUCT || node->type == NODE_TYPE_UNION;
 }
+
+bool nodeValid(struct node *node) {
+  return node && node->type != NODE_TYPE_BLANK;
+}

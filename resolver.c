@@ -3,6 +3,7 @@
 #include "node.h"
 #include "vector.h"
 #include <assert.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -14,6 +15,11 @@ void resolverFollowPart(struct resolverProcess *resolver, struct node *node,
 void resolverNewEntityForRule(struct resolverProcess *process,
                               struct resolverResult *result,
                               struct resolverEntityRule *rule);
+struct resolverEntity *resolverFollowExp(struct resolverProcess *resolver,
+                                         struct node *node,
+                                         struct resolverResult *result);
+struct resolverResult *resolverFollow(struct resolverProcess *resolver,
+                                      struct node *node);
 bool resolverResultFailed(struct resolverResult *result) {
   return result->flags & RESOLVER_RESULT_FLAG_FAILED;
 }
@@ -596,13 +602,88 @@ resolverFollowStructExpression(struct resolverProcess *resolver,
   resolverFollowPart(resolver, node->exp.right, result);
   return NULL;
 }
+struct resolverEntity *resolverFollowArray(struct resolverProcess *resolver,
+                                           struct node *node,
+                                           struct resolverResult *result) {
+  resolverFollowPart(resolver, node->exp.left, result);
+  struct resolverEntity *leftEntity = resolverResultPeek(result);
+  resolverFollowPart(resolver, node->exp.right, result);
+  return leftEntity;
+}
+struct datatype *resolverGetDatatype(struct resolverProcess *resolver,
+                                     struct node *node) {
+  struct resolverResult *result = resolverFollow(resolver, node);
+  if (!resolverResultOK(result)) {
+    return NULL;
+  }
+  return &result->lastEntity->dtype;
+}
+void resolverBuildFunctionCallArguments(
+    struct resolverProcess *resolver, struct node *argumentNode,
+    struct resolverEntity *rootFuncCallEntity, size_t *totalSizeOut) {
+  if (isArgumentNode(argumentNode)) {
+    resolverBuildFunctionCallArguments(resolver, argumentNode->exp.left,
+                                       rootFuncCallEntity, totalSizeOut);
+    resolverBuildFunctionCallArguments(resolver, argumentNode->exp.right,
+                                       rootFuncCallEntity, totalSizeOut);
+  } else if (argumentNode->type == NODE_TYPE_EXPRESSION_PARENTHESES) {
+    resolverBuildFunctionCallArguments(resolver, argumentNode->parenthesis.exp,
+                                       rootFuncCallEntity, totalSizeOut);
+  } else if (nodeValid(argumentNode)) {
+    vector_push(rootFuncCallEntity->funcCallData.arguments, &argumentNode);
+    size_t stackChange = DATA_SIZE_DWORD;
+    struct datatype *dtype = resolverGetDatatype(resolver, argumentNode);
+    if (dtype) {
+      stackChange = datatypeElementSize(dtype);
+      if (stackChange < DATA_SIZE_DWORD) {
+        stackChange = DATA_SIZE_DWORD;
+      }
+      stackChange = alignValue(stackChange, DATA_SIZE_DWORD);
+    }
+    *totalSizeOut += stackChange;
+  }
+}
+struct resolverEntity *
+resolverFollowFunctionCall(struct resolverProcess *resolver, struct node *node,
+                           struct resolverResult *result) {
+  // HERE
+  resolverFollowPart(resolver, node->exp.left, result);
+  struct resolverEntity *leftEntity = resolverResultPeek(result);
+  struct resolverEntity *funcCallEntity =
+      resolverCreateNewEntityForFunctionCall(result, resolver, leftEntity,
+                                             NULL);
+  if (!funcCallEntity) {
+    compilerError(
+        cp, "There was something wrong creating the function call entity \n");
+  }
+  funcCallEntity->flags |= RESOLVER_ENTITY_FLAG_NO_MERGE_WITH_NEXT_ENTITY |
+                           RESOLVER_ENTITY_FLAG_NO_MERGE_WITH_LEFT_ENTITY;
+
+  resolverBuildFunctionCallArguments(resolver, node->exp.right, funcCallEntity,
+                                     &funcCallEntity->funcCallData.stackSize);
+  resolverResultEntityPush(result, funcCallEntity);
+  return funcCallEntity;
+}
+struct resolverEntity *
+resolverFollowParentheses(struct resolverProcess *resolver, struct node *node,
+                          struct resolverResult *result) {
+  if (node->exp.left->type == NODE_TYPE_IDENTIFIER) {
+    return resolverFollowFunctionCall(resolver, node, result);
+  }
+  return resolverFollowExp(resolver, node->parenthesis.exp, result);
+}
 struct resolverEntity *resolverFollowExp(struct resolverProcess *resolver,
                                          struct node *node,
                                          struct resolverResult *result) {
   struct resolverEntity *entity = NULL;
   if (isAccessNode(node)) {
     entity = resolverFollowStructExpression(resolver, node, result);
+  } else if (isArrayNode(node)) {
+    entity = resolverFollowArray(resolver, node, result);
+  } else if (isParenthesesNode(node)) {
+    entity = resolverFollowParentheses(resolver, node, result);
   }
+  return entity;
 }
 struct resolverEntity *
 resolverFollowPartReturnEntity(struct resolverProcess *process,
