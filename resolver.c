@@ -685,6 +685,57 @@ struct resolverEntity *resolverFollowExp(struct resolverProcess *resolver,
   }
   return entity;
 }
+void resolverArrayBracketSetFlags(struct resolverEntity *bracketEntity,
+                                  struct datatype *dtype,
+                                  struct node *bracketNode, int index) {
+  if (!(dtype->flags & DATATYPE_FLAG_IS_ARRAY) ||
+      arrayBracketsCount(dtype) <= index) {
+    bracketEntity->flags = RESOLVER_ENTITY_FLAG_NO_MERGE_WITH_LEFT_ENTITY |
+                           RESOLVER_ENTITY_FLAG_NO_MERGE_WITH_NEXT_ENTITY |
+                           RESOLVER_ENTITY_FLAG_IS_POINTER_ARRAY_ENTITY;
+  } else if (bracketNode->bracket.inner->type != NODE_TYPE_NUMBER) {
+    bracketEntity->flags = RESOLVER_ENTITY_FLAG_NO_MERGE_WITH_LEFT_ENTITY |
+                           RESOLVER_ENTITY_FLAG_NO_MERGE_WITH_NEXT_ENTITY;
+  } else {
+    bracketEntity->flags = RESOLVER_ENTITY_FLAG_JUST_USE_OFFSET;
+  }
+}
+struct resolverEntity *
+resolverFollowArrayBracket(struct resolverProcess *process, struct node *node,
+                           struct resolverResult *result) {
+  if (node->type != NODE_TYPE_BRACKET) {
+    compilerError(cp, "Not a bracket node");
+  }
+  int index = 0;
+  struct datatype dtype;
+  struct resolverScope *scope = NULL;
+  struct resolverEntity *lastEntity =
+      resolverResultPeekIgnoreRuleEntity(result);
+  scope = lastEntity->scope;
+  dtype = lastEntity->dtype;
+  if (lastEntity->type == RESOLVER_ENTITY_TYPE_ARRAY_BRACKET) {
+    index = lastEntity->array.index + 1;
+  }
+  if (dtype.flags & DATATYPE_FLAG_IS_ARRAY) {
+    dtype.array.size = arrayBracketsCalculateSizeFromIndex(
+        &dtype, dtype.array.brackets, index + 1);
+  }
+  void *private = process->callbacks.new_array_entity(result, node);
+  struct resolverEntity *arrayBracketEntity =
+      resolverCreateNewEntityForArrayBracket(result, process, node,
+                                             node->bracket.inner, index, &dtype,
+                                             private, scope);
+
+  struct resolverEntityRule rule = {};
+  resolverArrayBracketSetFlags(arrayBracketEntity, &dtype, node, index);
+  lastEntity->flags |= RESOLVER_ENTITY_FLAG_USES_ARRAY_BRACKETS;
+  if (arrayBracketEntity->flags &
+      RESOLVER_ENTITY_FLAG_IS_POINTER_ARRAY_ENTITY) {
+    datatypeDecrementPtr(&arrayBracketEntity->dtype);
+  }
+  resolverResultEntityPush(result, arrayBracketEntity);
+  return arrayBracketEntity;
+}
 struct resolverEntity *
 resolverFollowPartReturnEntity(struct resolverProcess *process,
                                struct node *node,
@@ -696,6 +747,12 @@ resolverFollowPartReturnEntity(struct resolverProcess *process,
     break;
   case NODE_TYPE_VARIABLE:
     entity = resolverFollowVariable(process, node, result);
+    break;
+  case NODE_TYPE_EXPRESSION:
+    entity = resolverFollowExp(process, node, result);
+    break;
+  case NODE_TYPE_BRACKET:
+    entity = resolverFollowArrayBracket(process, node, result);
     break;
   }
 }

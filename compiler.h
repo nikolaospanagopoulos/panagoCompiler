@@ -489,3 +489,5 @@ bool isParenthesesOperator(const char *op);
 bool isParenthesesNode(struct node *node);
 bool isAccessNodeWithOp(struct node *node, const char *op);
 bool isArgumentNode(struct node *node);
+size_t arrayBracketsCount(struct datatype *dtype);
+void datatypeDecrementPtr(struct datatype *dtype);

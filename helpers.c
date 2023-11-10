@@ -185,3 +185,11 @@ bool isArgumentOperator(const char *op) { return S_EQ(op, ","); }
 bool isArgumentNode(struct node *node) {
   return node->type == NODE_TYPE_EXPRESSION && isArgumentOperator(node->exp.op);
 }
+
+void datatypeDecrementPtr(struct datatype *dtype) {
+  dtype->ptrDepth--;
+  if (dtype->ptrDepth <= 0) {
+    // unset is ptr flag
+    dtype->flags &= ~DATATYPE_FLAG_IS_POINTER;
+  }
+}
