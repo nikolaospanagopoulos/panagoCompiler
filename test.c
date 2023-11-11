@@ -1,3 +1,3 @@
 int x = 540;
 const char *name = "nikos";
-void dd() {}
+void dd() { int b = *a; }

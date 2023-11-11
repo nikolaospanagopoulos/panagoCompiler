@@ -55,6 +55,17 @@ struct parsedSwitchedCase {
   int index;
 };
 struct node;
+
+struct unary {
+  const char *op;
+  struct node *operand;
+  union {
+    struct indirection {
+      int depth;
+    } indirection;
+  };
+};
+
 typedef struct datatype {
   int flags;
   int type;
@@ -186,6 +197,7 @@ typedef struct node {
       struct datatype dtype;
       struct node *operand;
     } cast;
+    struct unary unary;
   };
 
   union {

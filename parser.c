@@ -31,6 +31,8 @@ struct parserScopeEntity {
   node *node;
 };
 
+int getPtrDepth();
+void parserDealWithAdditionalExpression();
 static void expectSym(char c);
 static void expectOp(const char *op);
 void parserScopeNew();
@@ -66,6 +68,7 @@ typedef struct history {
   } _switch;
 } history;
 
+void parseForParentheses(history *hs);
 struct parserHistorySwitch parserNewSwitchStmt(history *hs) {
   // TODO::: MAYBE CHANGE
   memset(&hs->_switch, 0, sizeof(hs->_switch));
@@ -243,18 +246,64 @@ void parserReorderExpressionNode(struct node **nodeOut) {
     parserNodeMoveRightLeftToLeft(node);
   }
 }
+bool parserIsUnaryOperator(const char *op) { return isUnaryOperator(op); }
+void parseForIndirectionUnary() {
+  int depth = getPtrDepth();
+  parseExpressionable(historyBegin(0));
+  struct node *unaryOperandNode = nodePop();
+  makeUnaryNode("*", unaryOperandNode);
 
+  struct node *unaryNode = nodePop();
+  unaryNode->unary.indirection.depth = depth;
+  nodePush(unaryNode);
+}
+
+void parseForNormalUnary() {
+  const char *unaryOp = tokenNext()->sval;
+  parseExpressionable(historyBegin(0));
+  struct node *unaryOperandNode = nodePop();
+  makeUnaryNode(unaryOp, unaryOperandNode);
+}
+
+void parseForUnary() {
+  const char *unaryOp = tokenPeekNext()->sval;
+  if (opIsIndirection(unaryOp)) {
+    parseForIndirectionUnary();
+    return;
+  }
+  parseForNormalUnary();
+  parserDealWithAdditionalExpression();
+}
 int parseExpressionNormal(history *hs) {
   token *opToken = tokenPeekNext();
   char *op = opToken->sval;
   node *nodeLeft = nodePeekExpressionableOrNull();
   if (!nodeLeft) {
-    return -1;
+    if (!parserIsUnaryOperator(op)) {
+      compilerError(currentProcess, "The given expression has no left operand");
+    }
+    parseForUnary();
+    return 0;
   }
   tokenNext();
   nodePop();
   nodeLeft->flags |= INSIDE_EXPRESSION;
-  parseExpressionableForOp(historyDown(hs, hs->flags), op);
+  if (tokenPeekNext()->type == OPERATOR) {
+    if (S_EQ(tokenPeekNext()->sval, "(")) {
+      parseForParentheses(historyDown(
+          hs, hs->flags | HISTORY_FLAG_PARENTHESES_NOT_A_FUNCTION_CALL));
+    } else if (parserIsUnaryOperator(tokenPeekNext()->sval)) {
+      parseForUnary();
+    } else {
+      compilerError(
+          currentProcess,
+          "Two operators are expected for a given expression for operator %s\n",
+          tokenPeekNext()->sval);
+    }
+  } else {
+
+    parseExpressionableForOp(historyDown(hs, hs->flags), op);
+  }
   node *rightNode = nodePop();
   if (!rightNode) {
     return -1;

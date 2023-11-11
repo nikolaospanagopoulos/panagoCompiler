@@ -193,3 +193,9 @@ void datatypeDecrementPtr(struct datatype *dtype) {
     dtype->flags &= ~DATATYPE_FLAG_IS_POINTER;
   }
 }
+
+bool isUnaryOperator(const char *op) {
+  return S_EQ(op, "-") || S_EQ(op, "!") || S_EQ(op, "~") || S_EQ(op, "*") ||
+         S_EQ(op, "&");
+}
+bool opIsIndirection(const char *op) { return S_EQ(op, "*"); }

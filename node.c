@@ -298,3 +298,7 @@ bool nodeIsStructOrUnion(struct node *node) {
 bool nodeValid(struct node *node) {
   return node && node->type != NODE_TYPE_BLANK;
 }
+void makeUnaryNode(const char *op, struct node *operandNode) {
+  nodeCreate(&(struct node){
+      .type = NODE_TYPE_UNARY, .unary.op = op, .unary.operand = operandNode});
+}
