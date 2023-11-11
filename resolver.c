@@ -3,6 +3,7 @@
 #include "node.h"
 #include "vector.h"
 #include <assert.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,6 +21,10 @@ struct resolverEntity *resolverFollowExp(struct resolverProcess *resolver,
                                          struct resolverResult *result);
 struct resolverResult *resolverFollow(struct resolverProcess *resolver,
                                       struct node *node);
+struct resolverEntity *
+resolverFollowPartReturnEntity(struct resolverProcess *process,
+                               struct node *node,
+                               struct resolverResult *result);
 bool resolverResultFailed(struct resolverResult *result) {
   return result->flags & RESOLVER_RESULT_FLAG_FAILED;
 }
@@ -737,6 +742,61 @@ resolverFollowArrayBracket(struct resolverProcess *process, struct node *node,
   return arrayBracketEntity;
 }
 struct resolverEntity *
+resolverFollowExpParentheses(struct resolverProcess *process, struct node *node,
+                             struct resolverResult *result) {
+  return resolverFollowPartReturnEntity(process, node->parenthesis.exp, result);
+}
+
+struct resolverEntity *
+resolverFollowUnsupportedUnaryNode(struct resolverProcess *process,
+                                   struct node *node,
+                                   struct resolverResult *result) {
+  return resolverFollowPartReturnEntity(process, node->parenthesis.exp, result);
+}
+struct resolverEntity *
+resolverFollowUnsupportedNode(struct resolverProcess *process,
+                              struct node *node,
+                              struct resolverResult *result) {
+  bool followed = false;
+
+  switch (node->type) {
+
+  case NODE_TYPE_UNARY:
+    resolverFollowUnsupportedUnaryNode(process, node, result);
+    followed = true;
+    break;
+
+  default:
+    followed = false;
+  }
+
+  struct resolverEntity *unsupportedEntity =
+      resolverCreateNewEntityForUnsupportedNodes(result, node);
+
+  if (!unsupportedEntity) {
+    compilerError(cp, "Unsupported entity doesnt exist \n");
+  }
+  resolverResultEntityPush(result, unsupportedEntity);
+  return unsupportedEntity;
+}
+
+struct resolverEntity *resolverFollowCast(struct resolverProcess *process,
+                                          struct node *node,
+                                          struct resolverResult *result) {
+  struct resolverEntity *operandEntity = NULL;
+  resolverFollowUnsupportedNode(process, node->cast.operand, result);
+
+  operandEntity = resolverResultPeek(result);
+  operandEntity->flags |= RESOLVER_ENTITY_FLAG_WAS_CASTED;
+
+  struct resolverEntity *castEntity = resolverCreateNewCastEntity(
+      process, operandEntity->scope, &node->cast.dtype);
+
+  resolverResultEntityPush(result, castEntity);
+
+  return castEntity;
+}
+struct resolverEntity *
 resolverFollowPartReturnEntity(struct resolverProcess *process,
                                struct node *node,
                                struct resolverResult *result) {
@@ -753,6 +813,12 @@ resolverFollowPartReturnEntity(struct resolverProcess *process,
     break;
   case NODE_TYPE_BRACKET:
     entity = resolverFollowArrayBracket(process, node, result);
+    break;
+  case NODE_TYPE_EXPRESSION_PARENTHESES:
+    entity = resolverFollowExpParentheses(process, node, result);
+    break;
+  case NODE_TYPE_CAST:
+    entity = resolverFollowCast(process, node, result);
     break;
   }
 }
