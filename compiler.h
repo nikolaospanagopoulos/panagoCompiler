@@ -494,3 +494,4 @@ void datatypeDecrementPtr(struct datatype *dtype);
 bool isUnaryOperator(const char *op);
 bool opIsIndirection(const char *op);
 void makeUnaryNode(const char *op, struct node *operandNode);
+bool opIsAddress(const char *op);

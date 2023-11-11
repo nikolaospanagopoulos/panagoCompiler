@@ -199,3 +199,5 @@ bool isUnaryOperator(const char *op) {
          S_EQ(op, "&");
 }
 bool opIsIndirection(const char *op) { return S_EQ(op, "*"); }
+
+bool opIsAddress(const char *op) { return S_EQ(op, "&"); }

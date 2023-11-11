@@ -797,6 +797,50 @@ struct resolverEntity *resolverFollowCast(struct resolverProcess *process,
   return castEntity;
 }
 struct resolverEntity *
+resolverFollowIndirection(struct resolverProcess *process, struct node *node,
+                          struct resolverResult *result) {
+  resolverFollowPart(process, node->unary.operand, result);
+
+  struct resolverEntity *lastEntity = resolverResultPeek(result);
+
+  if (!lastEntity) {
+    lastEntity =
+        resolverFollowUnsupportedNode(process, node->unary.operand, result);
+  }
+  struct resolverEntity *unaryIndirectionEntity =
+      resolverCreateNewUnaryIndirectionEntity(process, result, node,
+                                              node->unary.indirection.depth);
+
+  resolverResultEntityPush(result, unaryIndirectionEntity);
+
+  return unaryIndirectionEntity;
+}
+struct resolverEntity *
+resolverFollowUnaryAddress(struct resolverProcess *process, struct node *node,
+                           struct resolverResult *result) {
+  resolverFollowPart(process, node->unary.operand, result);
+  struct resolverEntity *lastEntity = resolverResultPeek(result);
+  struct resolverEntity *unaryAddressEntity =
+      resolverCreateNewUnaryGetAddressEntity(
+          process, result, &lastEntity->dtype, node, lastEntity->scope,
+          lastEntity->offset);
+
+  resolverResultEntityPush(result, unaryAddressEntity);
+
+  return unaryAddressEntity;
+}
+struct resolverEntity *resolverFollowUnary(struct resolverProcess *process,
+                                           struct node *node,
+                                           struct resolverResult *result) {
+  struct resolverEntity *resultEntity = NULL;
+  if (opIsIndirection(node->unary.op)) {
+    resultEntity = resolverFollowIndirection(process, node, result);
+  } else if (opIsAddress(node->unary.op)) {
+    resultEntity = resolverFollowUnaryAddress(process, node, result);
+  }
+  return resultEntity;
+}
+struct resolverEntity *
 resolverFollowPartReturnEntity(struct resolverProcess *process,
                                struct node *node,
                                struct resolverResult *result) {
@@ -820,7 +864,18 @@ resolverFollowPartReturnEntity(struct resolverProcess *process,
   case NODE_TYPE_CAST:
     entity = resolverFollowCast(process, node, result);
     break;
+  case NODE_TYPE_UNARY:
+    entity = resolverFollowUnary(process, node, result);
+    break;
+  default: {
+    entity = resolverFollowUnsupportedNode(process, node, result);
   }
+  }
+  if (entity) {
+    entity->result = result;
+    entity->process = process;
+  }
+  return entity;
 }
 void resolverFollowPart(struct resolverProcess *resolver, struct node *node,
                         struct resolverResult *result) {
