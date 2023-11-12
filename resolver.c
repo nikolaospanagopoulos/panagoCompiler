@@ -12,6 +12,8 @@ static struct compileProcess *cp;
 void setCompileProcessForResolver(compileProcess *process) { cp = process; }
 void resolverFollowPart(struct resolverProcess *resolver, struct node *node,
                         struct resolverResult *result);
+void resolverResultEntityPush(struct resolverResult *result,
+                              struct resolverEntity *entity);
 
 void resolverNewEntityForRule(struct resolverProcess *process,
                               struct resolverResult *result,
@@ -25,6 +27,9 @@ struct resolverEntity *
 resolverFollowPartReturnEntity(struct resolverProcess *process,
                                struct node *node,
                                struct resolverResult *result);
+
+void resolverFinalizeLastEntity(struct resolverProcess *process,
+                                struct resolverResult *result);
 bool resolverResultFailed(struct resolverResult *result) {
   return result->flags & RESOLVER_RESULT_FLAG_FAILED;
 }
@@ -883,10 +888,174 @@ void resolverFollowPart(struct resolverProcess *resolver, struct node *node,
 }
 void resolverMergeCompileTimes(struct resolverProcess *resolver,
                                struct resolverResult *result) {}
+
+void resolverFinalizeResultFlags(struct resolverProcess *process,
+                                 struct resolverResult *result) {
+  int flags = RESOLVER_RESULT_FLAG_FIRST_ENTITY_PUSH_VALUE;
+  struct resolverEntity *entity = result->entity;
+  struct resolverEntity *firstEntity = entity;
+  struct resolverEntity *lastEntity = result->lastEntity;
+
+  bool doesGetAddress = false;
+
+  if (entity == lastEntity) {
+    if (lastEntity->type == RESOLVER_ENTITY_TYPE_VARIABLE &&
+        datatypeIsStructOrUnionNotPtr(&lastEntity->dtype)) {
+      flags |= RESOLVER_RESULT_FLAG_FIRST_ENTITY_LOAD_TO_EBX;
+      flags &= ~RESOLVER_RESULT_FLAG_FIRST_ENTITY_PUSH_VALUE;
+    }
+
+    result->flags = flags;
+    return;
+  }
+  while (entity) {
+    if (entity->flags & RESOLVER_ENTITY_FLAG_DO_INDIRECTION) {
+      flags |= RESOLVER_RESULT_FLAG_FIRST_ENTITY_LOAD_TO_EBX |
+               RESOLVER_RESULT_FLAG_FINAL_INDIRECTION_REQUIRED_FOR_VALUE;
+      flags &= ~RESOLVER_RESULT_FLAG_FIRST_ENTITY_PUSH_VALUE;
+    }
+    if (entity->type == RESOLVER_ENTITY_TYPE_UNARY_GET_ADDRESS) {
+      flags |= RESOLVER_RESULT_FLAG_FIRST_ENTITY_LOAD_TO_EBX |
+               RESOLVER_RESULT_FLAG_DOES_GET_ADDRESS;
+      flags &= ~RESOLVER_RESULT_FLAG_FIRST_ENTITY_PUSH_VALUE |
+               RESOLVER_RESULT_FLAG_FINAL_INDIRECTION_REQUIRED_FOR_VALUE;
+      doesGetAddress = true;
+    }
+    if (entity->type == RESOLVER_ENTITY_TYPE_FUNCTION_CALL) {
+      flags |= RESOLVER_RESULT_FLAG_FIRST_ENTITY_LOAD_TO_EBX;
+      flags &= ~RESOLVER_RESULT_FLAG_FIRST_ENTITY_PUSH_VALUE;
+    }
+
+    if (entity->type == RESOLVER_ENTITY_TYPE_ARRAY_BRACKET) {
+      if (entity->dtype.flags & DATATYPE_FLAG_IS_POINTER) {
+        flags |= RESOLVER_RESULT_FLAG_FIRST_ENTITY_PUSH_VALUE;
+        flags &= ~RESOLVER_RESULT_FLAG_FIRST_ENTITY_LOAD_TO_EBX;
+      } else {
+        flags |= RESOLVER_RESULT_FLAG_FIRST_ENTITY_LOAD_TO_EBX;
+        flags &= ~RESOLVER_RESULT_FLAG_FIRST_ENTITY_PUSH_VALUE;
+      }
+
+      if (entity->flags & RESOLVER_ENTITY_FLAG_IS_POINTER_ARRAY_ENTITY) {
+        flags |= RESOLVER_RESULT_FLAG_FINAL_INDIRECTION_REQUIRED_FOR_VALUE;
+      }
+    }
+    if (entity->type == RESOLVER_ENTITY_TYPE_GENERAL) {
+      flags |= RESOLVER_RESULT_FLAG_FIRST_ENTITY_LOAD_TO_EBX |
+               RESOLVER_RESULT_FLAG_FINAL_INDIRECTION_REQUIRED_FOR_VALUE;
+      flags &= ~RESOLVER_RESULT_FLAG_FIRST_ENTITY_PUSH_VALUE;
+    }
+    entity = entity->next;
+  }
+  if (lastEntity->dtype.flags & DATATYPE_FLAG_IS_ARRAY &&
+      (!doesGetAddress && lastEntity->type == RESOLVER_ENTITY_TYPE_VARIABLE &&
+       !(lastEntity->flags & RESOLVER_ENTITY_FLAG_USES_ARRAY_BRACKETS))) {
+    flags &= ~RESOLVER_RESULT_FLAG_FINAL_INDIRECTION_REQUIRED_FOR_VALUE;
+  } else if (lastEntity->type == RESOLVER_ENTITY_TYPE_VARIABLE) {
+    flags |= RESOLVER_RESULT_FLAG_FINAL_INDIRECTION_REQUIRED_FOR_VALUE;
+  }
+  if (doesGetAddress) {
+    flags &= ~RESOLVER_RESULT_FLAG_FINAL_INDIRECTION_REQUIRED_FOR_VALUE;
+  }
+  result->flags |= flags;
+}
+
 void resolverFinalizeResult(struct resolverProcess *resolver,
-                            struct resolverResult *result) {}
+                            struct resolverResult *result) {
+
+  struct resolverEntity *firstEntity = resolverResultEntityRoot(result);
+  if (!firstEntity) {
+    return;
+  }
+  resolver->callbacks.set_result_base(result, firstEntity);
+  resolverFinalizeResultFlags(resolver, result);
+  resolverFinalizeLastEntity(resolver, result);
+}
+
+void resolverFinalizeUnary(struct resolverProcess *process,
+                           struct resolverResult *result,
+                           struct resolverEntity *entity) {
+  struct resolverEntity *previousEntity = entity->prev;
+  if (!previousEntity) {
+    return;
+  }
+  entity->scope = previousEntity->scope;
+  entity->dtype = previousEntity->dtype;
+  entity->offset = previousEntity->offset;
+
+  if (entity->type == RESOLVER_ENTITY_TYPE_UNARY_INDIRECTION) {
+    int indirectionDepth = entity->indirection.depth;
+    entity->dtype.ptrDepth -= indirectionDepth;
+    if (entity->dtype.ptrDepth <= 0) {
+      entity->dtype.flags &= ~DATATYPE_FLAG_IS_POINTER;
+    }
+  } else if (entity->type == RESOLVER_ENTITY_TYPE_UNARY_GET_ADDRESS) {
+    entity->dtype.flags |= DATATYPE_FLAG_IS_POINTER;
+    entity->dtype.ptrDepth++;
+  }
+}
+void resolverFinalizeLastEntity(struct resolverProcess *process,
+                                struct resolverResult *result) {
+  struct resolverEntity *lastEntity = resolverResultPeek(result);
+
+  switch (lastEntity->type) {
+
+  case RESOLVER_ENTITY_TYPE_UNARY_INDIRECTION:
+  case RESOLVER_ENTITY_TYPE_UNARY_GET_ADDRESS:
+    resolverFinalizeUnary(process, result, lastEntity);
+    break;
+  }
+}
+
+void resolverRuleApplyRules(struct resolverEntity *ruleEntity,
+                            struct resolverEntity *leftEntity,
+                            struct resolverEntity *rightEntity) {
+  if (ruleEntity->type != RESOLVER_ENTITY_TYPE_RULE) {
+    compilerError(cp, "No rule entity \n");
+  }
+  if (leftEntity) {
+    leftEntity->flags |= ruleEntity->rule.left.flags;
+  }
+  if (rightEntity) {
+    rightEntity->flags |= ruleEntity->rule.right.flags;
+  }
+}
+
+void resolverPushVectorOfEntities(struct resolverResult *result,
+                                  struct vector *vec) {
+  vector_set_peek_pointer_end(vec);
+
+  vector_set_flag(vec, VECTOR_FLAG_PEEK_DECREMENT);
+
+  struct resolverEntity *entity = vector_peek_ptr(vec);
+
+  while (entity) {
+    resolverResultEntityPush(result, entity);
+    entity = vector_peek_ptr(vec);
+  }
+}
+
 void resolverExecuteRules(struct resolverProcess *resolver,
-                          struct resolverResult *result) {}
+                          struct resolverResult *result) {
+
+  struct vector *savedEntities = vector_create(sizeof(struct resolverEntity *));
+  // TODO: CHECK MEMORY
+  vector_push(cp->gbForVectors, savedEntities);
+  struct resolverEntity *entity = resolverResultPop(result);
+  struct resolverEntity *lastProcessedEntity = NULL;
+
+  while (entity) {
+    if (entity->type == RESOLVER_ENTITY_TYPE_RULE) {
+      struct resolverEntity *leftEntity = resolverResultPop(result);
+      resolverRuleApplyRules(entity, leftEntity, lastProcessedEntity);
+      entity = leftEntity;
+    }
+    vector_push(savedEntities, &entity);
+    lastProcessedEntity = entity;
+    entity = resolverResultPop(result);
+  }
+
+  resolverPushVectorOfEntities(result, savedEntities);
+}
 struct resolverResult *resolverFollow(struct resolverProcess *resolver,
                                       struct node *node) {
   if (!resolver) {

@@ -495,3 +495,4 @@ bool isUnaryOperator(const char *op);
 bool opIsIndirection(const char *op);
 void makeUnaryNode(const char *op, struct node *operandNode);
 bool opIsAddress(const char *op);
+bool datatypeIsStructOrUnionNotPtr(struct datatype *dtype);

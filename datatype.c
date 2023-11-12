@@ -44,3 +44,8 @@ size_t datatypeSize(struct datatype *dtype) {
 bool datatypeIsPrimitive(struct datatype *dtype) {
   return !dataTypeIsStructOrUnion(dtype);
 }
+
+bool datatypeIsStructOrUnionNotPtr(struct datatype *dtype) {
+  return dtype->type != DATA_TYPE_UNKNOWN && !datatypeIsPrimitive(dtype) &&
+         !(dtype->flags & DATATYPE_FLAG_IS_POINTER);
+}
