@@ -374,6 +374,26 @@ struct resolverEntity {
   struct resolverEntity *next;
   struct resolverEntity *prev;
 };
+enum {
+  RESOLVER_DEFAULT_ENTITY_DATA_TYPE_VARIABLE,
+  RESOLVER_DEFAULT_ENTITY_DATA_TYPE_FUNCTION,
+  RESOLVER_DEFAULT_ENTITY_DATA_TYPE_ARRAY_BRACKET,
+};
+struct resolverDefaultEntityData {
+  // type (variable , function, struct)
+  int type;
+  // address [ebp - 4], [varname + 4]
+  char address[60];
+  // ebp, var name
+  char baseAddress[60];
+  // -4
+  int offset;
+  // flags
+  int flags;
+};
+struct resolverDefaultScopeData {
+  int flags;
+};
 
 int arrayTotalIndexes(struct datatype *dtype);
 size_t arrayBracketsCalcSize(struct datatype *dtype,
@@ -496,3 +516,4 @@ bool opIsIndirection(const char *op);
 void makeUnaryNode(const char *op, struct node *operandNode);
 bool opIsAddress(const char *op);
 bool datatypeIsStructOrUnionNotPtr(struct datatype *dtype);
+bool functionNodeIsPrototype(struct node *node);

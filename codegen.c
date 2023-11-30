@@ -14,7 +14,7 @@ void codegenNewScope(int flags) {}
 void codegenFinishScope() {}
 int codegenLabelCount();
 const char *codegenRegisterString(const char *str);
-
+static struct node *currentFunction = NULL;
 void asmPushArgs(const char *ins, va_list args) {
   va_list args2;
   va_copy(args2, args);
@@ -190,7 +190,34 @@ void generateRod() {
   asmPush("section .rodata");
   codegenWriteStrings();
 }
-void codegenGenerateRootNode(struct node *node) {}
+
+/*
+struct resolverEntity *codegenRegisterFunction(struct node*funcNode, int flags){
+        return resolverDefaultRegisterFunction(currentProcess->)
+}
+*/
+
+void codegenGenerateFunctionPrototype(struct node *node) {
+  // codegenRegisterFunction(node, 0);
+  // asmPush("extern %s", node->func.name);
+}
+void codegenGenerateFunction(struct node *node) {
+  currentFunction = node;
+  if (functionNodeIsPrototype(node)) {
+    codegenGenerateFunctionPrototype(node);
+    return;
+  }
+}
+void codegenGenerateRootNode(struct node *node) {
+  switch (node->type) {
+  case NODE_TYPE_VARIABLE:
+    // processed earlied in .data section
+    break;
+  case NODE_TYPE_FUNCTION:
+    codegenGenerateFunction(node);
+    break;
+  }
+}
 void codegenGenerateRoot() {
   asmPush("section .text");
   struct node *node = NULL;

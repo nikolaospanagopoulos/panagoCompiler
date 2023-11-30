@@ -302,3 +302,6 @@ void makeUnaryNode(const char *op, struct node *operandNode) {
   nodeCreate(&(struct node){
       .type = NODE_TYPE_UNARY, .unary.op = op, .unary.operand = operandNode});
 }
+bool functionNodeIsPrototype(struct node *node) {
+  return node->func.bodyN == NULL;
+}
