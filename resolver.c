@@ -168,7 +168,7 @@ struct resolverScope *resolverNewScopeCreate() {
   return scope;
 }
 struct resolverScope *resolverNewScope(struct resolverProcess *resolver,
-                                       void *private, int flags) {
+                                       void *privateData, int flags) {
   struct resolverScope *scope = resolverNewScopeCreate();
   if (!scope) {
     return NULL;
@@ -176,7 +176,7 @@ struct resolverScope *resolverNewScope(struct resolverProcess *resolver,
   resolver->scope.current->next = scope;
   scope->prev = resolver->scope.current;
   resolver->scope.current = scope;
-  scope->privateData = private;
+  scope->privateData = privateData;
   scope->flags = flags;
   return scope;
 }

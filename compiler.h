@@ -375,6 +375,11 @@ struct resolverEntity {
   struct resolverEntity *prev;
 };
 enum {
+  RESOLVER_DEFAULT_ENTITY_TYPE_STACK,
+  RESOLVER_DEFAULT_ENTITY_TYPE_SYMBOL
+};
+enum { RESOLVER_DEFAULT_ENTITY_FLAG_IS_LOCAL_STACK = 0b00000001 };
+enum {
   RESOLVER_DEFAULT_ENTITY_DATA_TYPE_VARIABLE,
   RESOLVER_DEFAULT_ENTITY_DATA_TYPE_FUNCTION,
   RESOLVER_DEFAULT_ENTITY_DATA_TYPE_ARRAY_BRACKET,
@@ -517,3 +522,22 @@ void makeUnaryNode(const char *op, struct node *operandNode);
 bool opIsAddress(const char *op);
 bool datatypeIsStructOrUnionNotPtr(struct datatype *dtype);
 bool functionNodeIsPrototype(struct node *node);
+void setCompileProcessForResolverDefaultHandler(compileProcess *process);
+struct resolverEntity *
+resolverNewEntityForVarNode(struct resolverProcess *process,
+                            struct node *varNode, void *privateData,
+                            int offset);
+struct resolverEntity *resolverRegisterFunction(struct resolverProcess *process,
+                                                struct node *funcNode,
+                                                void *privateData);
+struct resolverScope *resolverNewScope(struct resolverProcess *resolver,
+                                       void *privateData, int flags);
+void resolverFinishScope(struct resolverProcess *resolver);
+struct resolverEntity *resolverMakeEntity(struct resolverProcess *process,
+                                          struct resolverResult *result,
+                                          struct datatype *customDtype,
+                                          struct node *node,
+                                          struct resolverEntity *guidedEntity,
+                                          struct resolverScope *scope);
+struct resolverProcess *resolverNewProcess(struct compileProcess *compiler,
+                                           struct resolverCallbacks *callbacks);

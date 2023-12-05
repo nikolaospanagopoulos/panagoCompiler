@@ -77,6 +77,8 @@ int compileFile(const char *filename, const char *outFileName, int flags) {
   }
   setCompileProcessForStackFrame(process);
   setCompileProcessForResolver(process);
+  setCompileProcessForResolverDefaultHandler(process);
+
   if (codegen(process) != CODEGEN_ALL_OK) {
     freeLexProcess(lexProcess);
     freeCompileProcess(process);
