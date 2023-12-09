@@ -84,6 +84,25 @@ void codegenFree(compileProcess *process) {
   vector_free(process->generator->stringTable);
   free(process->generator);
 }
+
+void freeResolverTrackedScopes(compileProcess *process) {
+  vector_set_peek_pointer(process->trackedScopes, 0);
+  struct resolverScope **data =
+      (struct resolverScope **)vector_peek(process->trackedScopes);
+  while (data) {
+    vector_free((*data)->entities);
+    free(*data);
+    data = (struct resolverScope **)vector_peek(process->trackedScopes);
+  }
+}
+
+void resolverFree(compileProcess *process) {
+
+  freeResolverTrackedScopes(process);
+  vector_free(process->trackedScopes);
+
+  free(process->resolver);
+}
 void freeCompileProcess(compileProcess *cp) {
   if (cp->cfile.fp) {
     fclose(cp->cfile.fp);
@@ -104,11 +123,10 @@ void freeCompileProcess(compileProcess *cp) {
   scopeFreeRoot(cp);
   fixupSystemFree(cp->parserFixupSystem);
 
-  codegenFree(cp);
-
   vector_free(cp->gb);
+  resolverFree(cp);
+  codegenFree(cp);
 }
-
 compileProcess *compileProcessCreate(const char *filename,
                                      const char *filenameOutName, int flags) {
   FILE *file = fopen(filename, "r");
@@ -133,7 +151,9 @@ compileProcess *compileProcessCreate(const char *filename,
   process->gb = vector_create(sizeof(void *));
   process->gbForVectors = vector_create(sizeof(struct vector *));
   process->generator = codegenNew(process);
+  process->resolver = resolverDefaultNewProcess(process);
   symResolverInitialize(process);
   symresolverNewTable(process);
+
   return process;
 }

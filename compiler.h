@@ -541,3 +541,8 @@ struct resolverEntity *resolverMakeEntity(struct resolverProcess *process,
                                           struct resolverScope *scope);
 struct resolverProcess *resolverNewProcess(struct compileProcess *compiler,
                                            struct resolverCallbacks *callbacks);
+struct resolverEntity *
+resolverDefaultRegisterFunction(struct resolverProcess *resolver,
+                                struct node *funcNode, int flags);
+struct resolverProcess *
+resolverDefaultNewProcess(struct compileProcess *compileProcess);

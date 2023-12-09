@@ -191,15 +191,15 @@ void generateRod() {
   codegenWriteStrings();
 }
 
-/*
-struct resolverEntity *codegenRegisterFunction(struct node*funcNode, int flags){
-        return resolverDefaultRegisterFunction(currentProcess->)
+struct resolverEntity *codegenRegisterFunction(struct node *funcNode,
+                                               int flags) {
+  return resolverDefaultRegisterFunction(currentProcess->resolver, funcNode,
+                                         flags);
 }
-*/
 
 void codegenGenerateFunctionPrototype(struct node *node) {
-  // codegenRegisterFunction(node, 0);
-  // asmPush("extern %s", node->func.name);
+  codegenRegisterFunction(node, 0);
+  asmPush("extern %s", node->func.name);
 }
 void codegenGenerateFunction(struct node *node) {
   currentFunction = node;

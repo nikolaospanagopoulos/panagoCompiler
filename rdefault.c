@@ -194,6 +194,7 @@ resolverDefaultMergeEntities(struct resolverProcess *process,
 }
 struct resolverProcess *
 resolverDefaultNewProcess(struct compileProcess *compileProcess) {
+
   return resolverNewProcess(
       compileProcess, &(struct resolverCallbacks){
                           .new_array_entity = resolverDefaultNewArrayEntity,

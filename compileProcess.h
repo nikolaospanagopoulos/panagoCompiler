@@ -34,6 +34,7 @@ typedef struct compileProcess {
   struct vector *nodeGarbageVec;
   struct vector *gb;
   struct vector *gbForVectors;
+  struct vector *trackedScopes;
   struct {
     scope *root;
     scope *current;
@@ -42,6 +43,7 @@ typedef struct compileProcess {
     struct vector *table;
     struct vector *tables;
   } symbols;
+  struct resolverProcess *resolver;
   struct codeGenerator *generator;
 } compileProcess;
 

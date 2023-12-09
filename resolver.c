@@ -165,6 +165,7 @@ struct resolverScope *resolverNewScopeCreate() {
   // TODO: cleanup needed ???
   struct resolverScope *scope = calloc(1, sizeof(struct resolverScope));
   scope->entities = vector_create(sizeof(struct resolverEntity));
+  vector_push(cp->trackedScopes, &scope);
   return scope;
 }
 struct resolverScope *resolverNewScope(struct resolverProcess *resolver,
@@ -184,14 +185,17 @@ void resolverFinishScope(struct resolverProcess *resolver) {
   struct resolverScope *scope = resolver->scope.current;
   resolver->scope.current = scope->prev;
   resolver->callbacks.delete_scope(scope);
-  free(scope);
+  // MAYBE FREE SCOPE HERE TODO
+  // free(scope);
 }
 
 struct resolverProcess *
 resolverNewProcess(struct compileProcess *compiler,
                    struct resolverCallbacks *callbacks) {
   struct resolverProcess *process = calloc(1, sizeof(struct resolverProcess));
+  compiler->trackedScopes = vector_create(sizeof(struct resolverScope *));
   process->cmpProcess = compiler;
+  cp = compiler;
   memcpy(&process->callbacks, callbacks, sizeof(process->callbacks));
   process->scope.root = resolverNewScopeCreate();
   process->scope.current = process->scope.root;
