@@ -47,7 +47,7 @@ void stackFramePopExpecting(struct node *funcNode, int expectingType,
                   "Stackframe error: last element doesnt exist \n");
   }
   if (lastElement->type != expectingType ||
-      S_EQ(lastElement->name, expectingName)) {
+      !S_EQ(lastElement->name, expectingName)) {
     compilerError(currentProcess,
                   "Stackframe error: expecting wrong element\n");
   }

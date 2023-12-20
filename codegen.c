@@ -2,6 +2,7 @@
 #include "compiler.h"
 #include "node.h"
 #include "vector.h"
+#include <inttypes.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -10,11 +11,34 @@
 
 static struct compileProcess *currentProcess = NULL;
 
-void codegenNewScope(int flags) {}
-void codegenFinishScope() {}
+void codegenNewScope(int flags) {
+  resolverDefaultNewScope(currentProcess->resolver, flags);
+}
+
+void codegenFinishScope() {
+  resolverDefaultFinishScope(currentProcess->resolver);
+}
 int codegenLabelCount();
 const char *codegenRegisterString(const char *str);
 static struct node *currentFunction = NULL;
+
+static struct history {
+  int flags;
+} history;
+
+static struct history *historyBegin(int flags) {
+  struct history *history = calloc(1, sizeof(struct history));
+  history->flags = flags;
+  vector_push(currentProcess->gb, &history);
+  return history;
+}
+static struct history *historyDown(struct history *hs, int flags) {
+  struct history *newHistory = calloc(1, sizeof(history));
+  memcpy(newHistory, hs, sizeof(history));
+  newHistory->flags = flags;
+  vector_push(currentProcess->gb, &newHistory);
+  return newHistory;
+}
 void asmPushArgs(const char *ins, va_list args) {
   va_list args2;
   va_copy(args2, args);
@@ -44,6 +68,51 @@ void asmPushNoNl(const char *ins, ...) {
     va_end(args);
   }
 }
+
+int asmPushInsPop(const char *fmt, int expectingStackEntityType,
+                  const char *expectingStackEntityName, ...) {
+  char tmpBuf[200];
+  sprintf(tmpBuf, "pop %s", fmt);
+  va_list args;
+  va_start(args, expectingStackEntityName);
+  asmPushArgs(tmpBuf, args);
+  va_end(args);
+  if (!currentFunction) {
+    compilerError(currentProcess, "Function doesn't exist \n");
+  }
+  struct stackFrameElement *element = stackframeBack(currentFunction);
+  int flags = element->flags;
+  stackFramePopExpecting(currentFunction, expectingStackEntityType,
+                         expectingStackEntityName);
+  return flags;
+}
+
+void asmPushInsPush(const char *fmt, int stackEntityType,
+                    const char *stackEntityName, ...) {
+  char tmpBuf[200];
+  sprintf(tmpBuf, "push %s", fmt);
+  va_list args;
+  va_start(args, stackEntityName);
+  asmPushArgs(tmpBuf, args);
+  va_end(args);
+
+  if (!currentFunction) {
+    compilerError(currentProcess, "Function doesn't exist \n");
+  }
+  stackframePush(currentFunction,
+                 &(struct stackFrameElement){.type = stackEntityType,
+                                             .name = stackEntityName});
+}
+void asmPushEbp() {
+  asmPushInsPush("ebp", STACK_FRAME_ELEMENT_TYPE_SAVED_BP,
+                 "functionEntrySavedEbp");
+}
+
+void asmPopEbp() {
+  asmPushInsPop("ebp", STACK_FRAME_ELEMENT_TYPE_SAVED_BP,
+                "functionEntrySavedEbp");
+}
+
 static const char *asmKeywordForSize(size_t size, char *tmpBuff) {
   const char *keyword = NULL;
   switch (size) {
@@ -201,12 +270,85 @@ void codegenGenerateFunctionPrototype(struct node *node) {
   codegenRegisterFunction(node, 0);
   asmPush("extern %s", node->func.name);
 }
+
+void codegenStackSubWithName(size_t stackSize, const char *name) {
+  if (stackSize != 0) {
+    stackframeSub(currentFunction, STACK_FRAME_ELEMENT_TYPE_UNKNOWN, name,
+                  stackSize);
+    asmPush("sub esp %lld", stackSize);
+  }
+}
+void codegenStackAddWithName(size_t stackSize, const char *name) {
+  if (stackSize != 0) {
+    stackframeAdd(currentFunction, STACK_FRAME_ELEMENT_TYPE_UNKNOWN, name,
+                  stackSize);
+    asmPush("add esp %lld", stackSize);
+  }
+}
+
+void codegenStackAdd(size_t size) {
+  codegenStackAddWithName(size, "stack_change");
+}
+
+void codegenStackSub(size_t stackSize) {
+  codegenStackSubWithName(stackSize, "stack_change");
+}
+
+struct resolverEntity *codegenNewScopeEntity(struct node *varNode, int offset,
+                                             int flags) {
+  return resolverDefaultNewScopeEntity(currentProcess->resolver, varNode,
+                                       offset, flags);
+}
+
+void codegenGenerateFunctionArguments(struct vector *argumentVector) {
+  vector_set_peek_pointer(argumentVector, 0);
+  struct node *current = vector_peek_ptr(argumentVector);
+  // TODO: cleanup
+  while (current) {
+    codegenNewScopeEntity(current, current->var.aoffset,
+                          RESOLVER_DEFAULT_ENTITY_FLAG_IS_LOCAL_STACK);
+    current = vector_peek_ptr(argumentVector);
+  }
+}
+
+void codegenGenerateBody(struct node *node, struct history *history) {}
+
+void codegenGenerateFunctionWithBody(struct node *node) {
+  codegenRegisterFunction(node, 0);
+  asmPush("global %s", node->func.name);
+  asmPush("; %s function", node->func.name);
+  asmPush("%s:", node->func.name);
+
+  asmPushEbp();
+  asmPush("mov ebp, esp");
+  codegenStackSub(C_ALIGN(functionNodeStackSize(node, currentProcess)));
+  // TODO: cleanup
+  codegenNewScope(RESOLVER_DEFAULT_ENTITY_FLAG_IS_LOCAL_STACK);
+  codegenGenerateFunctionArguments(functionNodeArgumentVec(node));
+  // TODO: cleanup
+  codegenGenerateBody(node->func.bodyN, historyBegin(IS_ALONE_STATEMENT));
+  codegenFinishScope();
+  codegenStackAdd(C_ALIGN(functionNodeStackSize(node, currentProcess)));
+  asmPopEbp();
+  stackFrameAssertEmpty(currentFunction);
+  asmPush("ret");
+}
+
+struct vector *functionNodeArgumentVec(struct node *node) {
+  if (node->type != NODE_TYPE_FUNCTION) {
+    compilerError(currentProcess, "Not a function node \n");
+  }
+
+  return node->func.args.vector;
+}
+
 void codegenGenerateFunction(struct node *node) {
   currentFunction = node;
   if (functionNodeIsPrototype(node)) {
     codegenGenerateFunctionPrototype(node);
     return;
   }
+  codegenGenerateFunctionWithBody(node);
 }
 void codegenGenerateRootNode(struct node *node) {
   switch (node->type) {

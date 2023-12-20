@@ -14,6 +14,13 @@
   case ')':                                                                    \
   case ']'
 
+#define STACK_PUSH_SIZE 4
+#define C_STACK_ALIGNMENT 16
+#define C_ALIGN(size)                                                          \
+  (size % C_STACK_ALIGNMENT)                                                   \
+      ? size + (C_STACK_ALIGNMENT - (size % C_STACK_ALIGNMENT))                \
+      : size
+
 #define NUMERIC_CASE                                                           \
   case '0':                                                                    \
   case '1':                                                                    \
@@ -148,6 +155,7 @@ enum {
   DATA_SIZE_DWORD = 4,
   DATA_SIZE_DDWORD = 8
 };
+enum { IS_ALONE_STATEMENT = 0b00000001 };
 
 enum { FUNCTION_NODE_FLAG_IS_NATIVE = 0b00000001 };
 struct codegenEntryPoint {
@@ -546,3 +554,13 @@ resolverDefaultRegisterFunction(struct resolverProcess *resolver,
                                 struct node *funcNode, int flags);
 struct resolverProcess *
 resolverDefaultNewProcess(struct compileProcess *compileProcess);
+void stackFramePopExpecting(struct node *funcNode, int expectingType,
+                            const char *expectingName);
+size_t functionNodeStackSize(struct node *node, compileProcess *cp);
+struct vector *functionNodeArgumentVec(struct node *node);
+struct resolverEntity *
+resolverDefaultNewScopeEntity(struct resolverProcess *resolver,
+                              struct node *varNode, int offset, int flags);
+void resolverDefaultNewScope(struct resolverProcess *resolver, int flags);
+void resolverDefaultFinishScope(struct resolverProcess *resolver);
+void codegenFinishScope();

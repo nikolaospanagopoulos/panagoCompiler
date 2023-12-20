@@ -9,7 +9,6 @@
 #include <string.h>
 
 static struct compileProcess *cp;
-void setCompileProcessForResolver(compileProcess *process) { cp = process; }
 void resolverFollowPart(struct resolverProcess *resolver, struct node *node,
                         struct resolverResult *result);
 void resolverResultEntityPush(struct resolverResult *result,
@@ -185,8 +184,12 @@ void resolverFinishScope(struct resolverProcess *resolver) {
   struct resolverScope *scope = resolver->scope.current;
   resolver->scope.current = scope->prev;
   resolver->callbacks.delete_scope(scope);
-  // MAYBE FREE SCOPE HERE TODO
-  // free(scope);
+  //  MAYBE FREE SCOPE HERE TODO
+
+  vector_free(scope->entities);
+  scope->entities = NULL;
+
+  scope = NULL;
 }
 
 struct resolverProcess *

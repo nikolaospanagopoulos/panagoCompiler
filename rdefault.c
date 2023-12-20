@@ -163,7 +163,9 @@ void resolverDefaultDeleteEntity(struct resolverEntity *entity) {
   free(entity->privateData);
 }
 void resolverDefaultDeleteScope(struct resolverScope *scope) {
-  free(scope->privateData);
+  if (scope && scope->privateData) {
+    free(scope->privateData);
+  }
 }
 
 static void resolverDefaultMergeArrayCalculateOutOffset(

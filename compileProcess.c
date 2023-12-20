@@ -63,6 +63,18 @@ void freeVectorContents(struct vector *vecToFree) {
     data = (void **)vector_peek(vecToFree);
   }
 }
+void freeResolverEntitiesVector(struct vector *vecToFree) {
+  vector_set_peek_pointer(vecToFree, 0);
+  struct resolverEntity **data =
+      (struct resolverEntity **)vector_peek(vecToFree);
+  while (data) {
+    if ((*data)->privateData) {
+      free((*data)->privateData);
+    }
+    free(*data);
+    data = (struct resolverEntity **)vector_peek(vecToFree);
+  }
+}
 
 /*
 void freeVectorStringTable(struct vector *strTable) {
@@ -90,8 +102,14 @@ void freeResolverTrackedScopes(compileProcess *process) {
   struct resolverScope **data =
       (struct resolverScope **)vector_peek(process->trackedScopes);
   while (data) {
-    vector_free((*data)->entities);
-    free(*data);
+    if ((*data)->entities && vector_count((*data)->entities) > 0) {
+
+      freeResolverEntitiesVector((*data)->entities);
+      vector_free((*data)->entities);
+    }
+    if (*data) {
+      free(*data);
+    }
     data = (struct resolverScope **)vector_peek(process->trackedScopes);
   }
 }

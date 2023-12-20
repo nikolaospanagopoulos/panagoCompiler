@@ -305,3 +305,10 @@ void makeUnaryNode(const char *op, struct node *operandNode) {
 bool functionNodeIsPrototype(struct node *node) {
   return node->func.bodyN == NULL;
 }
+
+size_t functionNodeStackSize(struct node *node, compileProcess *cp) {
+  if (node->type != NODE_TYPE_FUNCTION) {
+    compilerError(cp, "Not a function node \n");
+  }
+  return node->func.stackSize;
+}
