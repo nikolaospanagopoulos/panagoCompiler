@@ -112,7 +112,26 @@ void asmPopEbp() {
   asmPushInsPop("ebp", STACK_FRAME_ELEMENT_TYPE_SAVED_BP,
                 "functionEntrySavedEbp");
 }
+void asmPushInsPushWithData(const char *fmt, int stackEntityType,
+                            const char *stackEntityName, int flags,
+                            struct stackFrameData *data, ...) {
 
+  char tmpBuff[200];
+  sprintf(tmpBuff, "push %s", fmt);
+  va_list args;
+  va_start(args, data);
+  asmPushArgs(tmpBuff, args);
+  va_end(args);
+  flags |= STACK_FRAME_ELEMENT_FLAG_HAS_DATATYPE;
+  if (!currentFunction) {
+    compilerError(currentProcess, "Not in a function \n");
+  }
+  stackframePush(currentFunction,
+                 &(struct stackFrameElement){.type = stackEntityType,
+                                             .name = stackEntityName,
+                                             .flags = flags,
+                                             .data = *data});
+}
 static const char *asmKeywordForSize(size_t size, char *tmpBuff) {
   const char *keyword = NULL;
   switch (size) {
@@ -310,8 +329,151 @@ void codegenGenerateFunctionArguments(struct vector *argumentVector) {
     current = vector_peek_ptr(argumentVector);
   }
 }
+void codegenGenerateNumberNode(struct node *node, struct history *history) {
+  asmPushInsPushWithData(
+      "dword %i", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE, "result_value",
+      STACK_FRAME_ELEMENT_FLAG_IS_NUMERICAL,
+      &(struct stackFrameData){.dtype = datatypeForNumeric()}, node->llnum);
+}
+bool codegenIsExpRootForFlags(int flags) {
+  return !(flags & EXPRESSION_IS_NOT_ROOT_NODE);
+}
+bool codegenIsExpRoot(struct history *history) {
+  return codegenIsExpRootForFlags(history->flags);
+}
+void codegenGenerateExpressionable(struct node *node, struct history *history) {
+  bool isRoot = codegenIsExpRoot(history);
+  if (isRoot) {
+    history->flags |= EXPRESSION_IS_NOT_ROOT_NODE;
+  }
 
-void codegenGenerateBody(struct node *node, struct history *history) {}
+  switch (node->type) {
+  case NODE_TYPE_NUMBER:
+    codegenGenerateNumberNode(node, history);
+    break;
+  }
+}
+const char *codegenSubRegister(const char *originalRegister, size_t size) {
+  const char *reg = NULL;
+  if (S_EQ(originalRegister, "eax")) {
+    if (size == DATA_SIZE_BYTE) {
+      reg = "al";
+    } else if (size == DATA_SIZE_WORD) {
+      reg = "ax";
+    } else if (size == DATA_SIZE_DWORD) {
+      reg = "eax";
+    } else if (size == DATA_SIZE_DDWORD) {
+      reg = "rax";
+    }
+  } else if (S_EQ(originalRegister, "ebx")) {
+    if (size == DATA_SIZE_BYTE) {
+      reg = "bl";
+    } else if (size == DATA_SIZE_WORD) {
+      reg = "bx";
+    } else if (size == DATA_SIZE_DWORD) {
+      reg = "ebx";
+    } else if (size == DATA_SIZE_DDWORD) {
+      reg = "rbx";
+    }
+  } else if (S_EQ(originalRegister, "ecx")) {
+    if (size == DATA_SIZE_BYTE) {
+      reg = "cl";
+    } else if (size == DATA_SIZE_WORD) {
+      reg = "cx";
+    } else if (size == DATA_SIZE_DWORD) {
+      reg = "ecx";
+    } else if (size == DATA_SIZE_DDWORD) {
+      reg = "rcx";
+    }
+  } else if (S_EQ(originalRegister, "edx")) {
+    if (size == DATA_SIZE_BYTE) {
+      reg = "dl";
+    } else if (size == DATA_SIZE_WORD) {
+      reg = "dx";
+    } else if (size == DATA_SIZE_DWORD) {
+      reg = "edx";
+    } else if (size == DATA_SIZE_DDWORD) {
+      reg = "rdx";
+    }
+  }
+  return reg;
+}
+const char *codegenByteWordOrDwordOrDDword(size_t size, const char **regToUse) {
+  const char *type = NULL;
+  const char *newRegister = *regToUse;
+  if (size == DATA_SIZE_BYTE) {
+    type = "byte";
+    newRegister = codegenSubRegister(*regToUse, DATA_SIZE_BYTE);
+  } else if (size == DATA_SIZE_WORD) {
+    type = "word";
+    newRegister = codegenSubRegister(*regToUse, DATA_SIZE_WORD);
+  } else if (size == DATA_SIZE_DWORD) {
+    type = "dword";
+    newRegister = codegenSubRegister(*regToUse, DATA_SIZE_DWORD);
+  } else if (size == DATA_SIZE_DDWORD) {
+    type = "ddword";
+    newRegister = codegenSubRegister(*regToUse, DATA_SIZE_DDWORD);
+  }
+  *regToUse = newRegister;
+  return type;
+}
+struct resolverDefaultEntityData *
+codegenEntityPrivate(struct resolverEntity *entity) {
+  return resolverDefaultEntityPrivate(entity);
+}
+void codegenGenerateAssignmentInstructionForOperator(const char *movTypeKeyword,
+                                                     const char *address,
+                                                     const char *regToUse,
+                                                     const char *operator,
+                                                     bool isSigned) {
+  if (S_EQ(operator, "=")) {
+    asmPush("mov %s [%s], %s", movTypeKeyword, address, regToUse);
+  } else if (S_EQ(operator, "+=")) {
+    asmPush("add %s [%s], %s", movTypeKeyword, address, regToUse);
+  }
+}
+void codegenGenerateScopeVariable(struct node *node) {
+  struct resolverEntity *entity = codegenNewScopeEntity(
+      node, node->var.aoffset, RESOLVER_DEFAULT_ENTITY_FLAG_IS_LOCAL_STACK);
+  if (node->var.val) {
+    codegenGenerateExpressionable(node->var.val,
+                                  historyBegin(EXPRESSION_IS_ASSIGNMENT |
+                                               IS_RIGHT_OPERAND_OF_ASSIGNMENT));
+    asmPushInsPop("eax", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE, "result_value");
+    const char *regToUse = "eax";
+    const char *movType = codegenByteWordOrDwordOrDDword(
+        datatypeElementSize(&entity->dtype), &regToUse);
+    codegenGenerateAssignmentInstructionForOperator(
+        movType, codegenEntityPrivate(entity)->address, regToUse, "=",
+        entity->dtype.flags & DATATYPE_FLAG_IS_SIGNED);
+  }
+}
+void codegenGenerateStatement(struct node *node, struct history *history) {
+  switch (node->type) {
+  case NODE_TYPE_VARIABLE:
+    codegenGenerateScopeVariable(node);
+    break;
+  }
+}
+void codegenGenerateScopeNoNewScope(struct vector *statements,
+                                    struct history *history) {
+  vector_set_peek_pointer(statements, 0);
+  struct node *statementNode = vector_peek_ptr(statements);
+  while (statementNode) {
+    codegenGenerateStatement(statementNode, history);
+    statementNode = vector_peek_ptr(statements);
+  }
+}
+void codegenGenerateStackScope(struct vector *statements, size_t scopeSize,
+                               struct history *history) {
+  codegenNewScope(RESOLVER_SCOPE_FLAG_IS_STACK);
+  codegenGenerateScopeNoNewScope(statements, history);
+  codegenFinishScope();
+}
+void codegenGenerateBody(struct node *node, struct history *history) {
+
+  codegenGenerateStackScope(node->body.statements, node->body.size, history);
+}
 
 void codegenGenerateFunctionWithBody(struct node *node) {
   codegenRegisterFunction(node, 0);

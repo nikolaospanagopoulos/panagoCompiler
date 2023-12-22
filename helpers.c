@@ -201,3 +201,12 @@ bool isUnaryOperator(const char *op) {
 bool opIsIndirection(const char *op) { return S_EQ(op, "*"); }
 
 bool opIsAddress(const char *op) { return S_EQ(op, "&"); }
+
+struct datatype datatypeForNumeric() {
+  struct datatype dtype = {};
+  dtype.flags |= DATATYPE_FLAG_IS_LITERAL;
+  dtype.type = DATA_TYPE_INTEGER;
+  dtype.typeStr = "int";
+  dtype.size = DATA_SIZE_DWORD;
+  return dtype;
+}

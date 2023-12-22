@@ -35,6 +35,7 @@ typedef struct compileProcess {
   struct vector *gb;
   struct vector *gbForVectors;
   struct vector *trackedScopes;
+  struct vector *gbVectorForCustonResolverEntities;
   struct {
     scope *root;
     scope *current;

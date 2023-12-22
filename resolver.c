@@ -207,12 +207,14 @@ resolverNewProcess(struct compileProcess *compiler,
 
 struct resolverEntity *resolverCreateNewEntity(struct resolverResult *result,
                                                int type, void *private) {
+  // TODO: cleanup
   struct resolverEntity *entity = calloc(1, sizeof(struct resolverEntity));
   if (!entity) {
     return NULL;
   }
   entity->type = type;
   entity->privateData = private;
+
   return entity;
 }
 struct resolverEntity *
@@ -372,6 +374,7 @@ struct resolverEntity *resolverCreateNewEntityForVarNodeCustomScope(
   entity->node = varNode;
   entity->name = varNode->var.name;
   entity->offset = offset;
+  vector_push(cp->gbVectorForCustonResolverEntities, &entity);
   return entity;
 }
 struct resolverEntity *
