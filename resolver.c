@@ -183,13 +183,6 @@ struct resolverScope *resolverNewScope(struct resolverProcess *resolver,
 void resolverFinishScope(struct resolverProcess *resolver) {
   struct resolverScope *scope = resolver->scope.current;
   resolver->scope.current = scope->prev;
-  resolver->callbacks.delete_scope(scope);
-  //  MAYBE FREE SCOPE HERE TODO
-
-  vector_free(scope->entities);
-  scope->entities = NULL;
-
-  scope = NULL;
 }
 
 struct resolverProcess *
@@ -214,6 +207,7 @@ struct resolverEntity *resolverCreateNewEntity(struct resolverResult *result,
   }
   entity->type = type;
   entity->privateData = private;
+  vector_push(cp->gbVectorForCustonResolverEntities, &entity);
 
   return entity;
 }
@@ -374,7 +368,6 @@ struct resolverEntity *resolverCreateNewEntityForVarNodeCustomScope(
   entity->node = varNode;
   entity->name = varNode->var.name;
   entity->offset = offset;
-  vector_push(cp->gbVectorForCustonResolverEntities, &entity);
   return entity;
 }
 struct resolverEntity *

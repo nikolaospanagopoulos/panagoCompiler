@@ -12,9 +12,9 @@ dd:
 push ebp
 mov ebp, esp
 sub esp 16
-push dword 5
+push dword 777
 pop eax
-mov dword [ebp+0], eax
+mov dword [ebp-4], eax
 add esp 16
 pop ebp
 ret

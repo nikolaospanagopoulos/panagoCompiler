@@ -108,12 +108,12 @@ void freeResolverTrackedScopes(compileProcess *process) {
   struct resolverScope **data =
       (struct resolverScope **)vector_peek(process->trackedScopes);
   while (data) {
-    if ((*data)->entities && vector_count((*data)->entities) > 0) {
+    if ((*data)->entities) {
 
-      freeResolverEntitiesVector((*data)->entities);
       vector_free((*data)->entities);
     }
     if (*data) {
+      free((*data)->privateData);
       free(*data);
     }
     data = (struct resolverScope **)vector_peek(process->trackedScopes);
@@ -149,9 +149,9 @@ void freeCompileProcess(compileProcess *cp) {
   fixupSystemFree(cp->parserFixupSystem);
 
   resolverFree(cp);
+  codegenFree(cp);
   freeVectorContents(cp->gb);
   vector_free(cp->gb);
-  codegenFree(cp);
 }
 compileProcess *compileProcessCreate(const char *filename,
                                      const char *filenameOutName, int flags) {

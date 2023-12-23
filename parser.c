@@ -782,6 +782,15 @@ void parserScopeOffsetForStack(node *varNode, history *hs) {
           padding(upwardStack ? offset : -offset, varNode->var.type.size);
     }
   }
+  bool firstEntity = !lastEntity;
+  if (nodeIsStructOrUnionVariable(varNode) &&
+      variableStructOrUnionBodyNode(varNode)->body.padded) {
+    variableNode(varNode)->var.padding =
+        padding(upwardStack ? offset : -offset, DATA_SIZE_DWORD);
+  }
+  variableNode(varNode)->var.aoffset =
+      offset + (upwardStack ? variableNode(varNode)->var.padding
+                            : -variableNode(varNode)->var.padding);
 }
 void parserScopeOffset(node *varNode, history *hs) {
   if (hs->flags & HISTORY_FLAG_IS_GLOBAL_SCOPE) {
