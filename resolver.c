@@ -76,7 +76,10 @@ struct resolverResult *resolverNewResult(struct resolverProcess *process) {
   vector_push(cp->gbForVectors, arrayEntities);
   */
 
+  vector_push(cp->gb, &result);
+  vector_push(cp->gbForVectors, &arrayEntities);
   result->arrayData.arrayEntities = arrayEntities;
+
   return result;
 }
 
@@ -356,7 +359,7 @@ struct resolverEntity *resolverCreateNewEntityForVarNodeCustomScope(
     compilerError(cp, "Not a variable \n");
   }
   struct resolverEntity *entity =
-      resolverCreateNewEntity(NULL, NODE_TYPE_VARIABLE, privateData);
+      resolverCreateNewEntity(NULL, RESOLVER_ENTITY_TYPE_VARIABLE, privateData);
   if (!entity) {
     return NULL;
   }
@@ -1042,7 +1045,7 @@ void resolverExecuteRules(struct resolverProcess *resolver,
 
   struct vector *savedEntities = vector_create(sizeof(struct resolverEntity *));
   // TODO: CHECK MEMORY
-  vector_push(cp->gbForVectors, savedEntities);
+  vector_push(cp->gbForVectors, &savedEntities);
   struct resolverEntity *entity = resolverResultPop(result);
   struct resolverEntity *lastProcessedEntity = NULL;
 

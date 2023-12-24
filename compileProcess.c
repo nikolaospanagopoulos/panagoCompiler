@@ -51,7 +51,9 @@ void freeNode(struct node *node) {
 void freeVectorContentsVectors(struct vector *vecToFree) {
   struct vector **data = (struct vector **)vector_peek(vecToFree);
   while (data) {
-    vector_free(*data);
+    if (*data) {
+      vector_free(*data);
+    }
     data = (struct vector **)vector_peek(vecToFree);
   }
 }

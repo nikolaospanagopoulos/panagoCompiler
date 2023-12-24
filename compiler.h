@@ -600,3 +600,8 @@ void codegenFinishScope();
 struct datatype datatypeForNumeric();
 struct resolverDefaultEntityData *
 resolverDefaultEntityPrivate(struct resolverEntity *entity);
+struct resolverResult *resolverFollow(struct resolverProcess *resolver,
+                                      struct node *node);
+bool resolverResultOK(struct resolverResult *result);
+struct resolverEntity *resolverResultEntityRoot(struct resolverResult *result);
+struct resolverEntity *resolverResultEntityNext(struct resolverEntity *entity);

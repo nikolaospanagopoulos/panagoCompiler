@@ -448,8 +448,133 @@ void codegenGenerateScopeVariable(struct node *node) {
         entity->dtype.flags & DATATYPE_FLAG_IS_SIGNED);
   }
 }
+void codegenGenerateEntityAccessStart(
+    struct resolverResult *result, struct resolverEntity *rootAssignmentEntity,
+    struct history *history) {
+  if (rootAssignmentEntity->type == RESOLVER_ENTITY_TYPE_UNSUPPORTED) {
+    codegenGenerateExpressionable(rootAssignmentEntity->node, history);
+  } else if (result->flags & RESOLVER_RESULT_FLAG_FIRST_ENTITY_PUSH_VALUE) {
+    asmPushInsPushWithData(
+        "dword [%s]", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE, "result_value", 0,
+        &(struct stackFrameData){.dtype = rootAssignmentEntity->dtype},
+        result->base.address);
+  } else if (result->flags & RESOLVER_RESULT_FLAG_FIRST_ENTITY_LOAD_TO_EBX) {
+    if (rootAssignmentEntity->next &&
+        rootAssignmentEntity->next->flags &
+            RESOLVER_ENTITY_FLAG_IS_POINTER_ARRAY_ENTITY) {
+      asmPush("mov ebx, [%s]", result->base.address);
+    } else {
+      asmPush("lea ebx, [%s]", result->base.address);
+    }
+    asmPushInsPushWithData(
+        "ebx", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE, "result_value", 0,
+        &(struct stackFrameData){.dtype = rootAssignmentEntity->dtype});
+  }
+}
+void codegenGenerateEntityAccessForVariableOrGeneral(
+    struct resolverResult *result, struct resolverEntity *entity) {
+  asmPushInsPop("ebx", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE, "result_value");
+  if (entity->flags & RESOLVER_ENTITY_FLAG_DO_INDIRECTION) {
+    asmPush("mov ebx, [ebx]");
+  }
+  asmPush("add ebx, %i", entity->offset);
+  asmPushInsPushWithData("ebx", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE,
+                         "result_value", 0,
+                         &(struct stackFrameData){.dtype = entity->dtype});
+}
+void codegenGenerateEntityAccessForEntityAssignmentLeftOperand(
+    struct resolverResult *result, struct resolverEntity *entity,
+    struct history *history) {
+  switch (entity->type) {
+
+  case RESOLVER_ENTITY_TYPE_ARRAY_BRACKET:
+    break;
+  case RESOLVER_ENTITY_TYPE_VARIABLE:
+  case RESOLVER_ENTITY_TYPE_GENERAL:
+    codegenGenerateEntityAccessForVariableOrGeneral(result, entity);
+    break;
+  case RESOLVER_ENTITY_TYPE_FUNCTION_CALL:
+    break;
+  case RESOLVER_ENTITY_TYPE_UNARY_INDIRECTION:
+    break;
+  case RESOLVER_ENTITY_TYPE_UNARY_GET_ADDRESS:
+    break;
+  case RESOLVER_ENTITY_TYPE_UNSUPPORTED:
+    break;
+  case RESOLVER_ENTITY_TYPE_CAST:
+    break;
+  default:
+    compilerError(currentProcess, "CompilerBug\n");
+  }
+}
+
+void codegenGenerateEntityAccessForAssignmentLeftOperand(
+    struct resolverResult *result, struct resolverEntity *rootAssignmentEntity,
+    struct node *topMostNode, struct history *history) {
+  codegenGenerateEntityAccessStart(result, rootAssignmentEntity, history);
+  struct resolverEntity *current =
+      resolverResultEntityNext(rootAssignmentEntity);
+  while (current) {
+
+    codegenGenerateEntityAccessForEntityAssignmentLeftOperand(result, current,
+                                                              history);
+    resolverResultEntityNext(current);
+  }
+}
+void codegenGenerateAssignmentPart(struct node *node, const char *op,
+                                   struct history *history) {
+  struct datatype rightOperandDtype;
+  struct resolverResult *result =
+      resolverFollow(currentProcess->resolver, node);
+  if (!resolverResultOK(result)) {
+    compilerError(currentProcess,
+                  "Something went wrong with the resolver result \n");
+  }
+  struct resolverEntity *rootAssignmentEntity =
+      resolverResultEntityRoot(result);
+  const char *regToUse = "eax";
+  const char *movType = codegenByteWordOrDwordOrDDword(
+      datatypeElementSize(&result->lastEntity->dtype), &regToUse);
+  struct resolverEntity *nextEntity =
+      resolverResultEntityNext(rootAssignmentEntity);
+  if (!nextEntity) {
+    if (datatypeIsStructOrUnionNotPtr(&result->lastEntity->dtype)) {
+
+    } else {
+      asmPushInsPop("eax", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE,
+                    "result_value");
+      codegenGenerateAssignmentInstructionForOperator(
+          movType, result->base.address, regToUse, op,
+          result->lastEntity->dtype.flags & DATATYPE_FLAG_IS_SIGNED);
+    }
+  } else {
+    codegenGenerateEntityAccessForAssignmentLeftOperand(
+        result, rootAssignmentEntity, node, history);
+    asmPushInsPop("edx", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE, "result_value");
+    asmPushInsPop("eax", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE, "result_value");
+    codegenGenerateAssignmentInstructionForOperator(
+        movType, "edx", regToUse, op,
+        result->lastEntity->flags & DATATYPE_FLAG_IS_SIGNED);
+  }
+}
+void codegenGenerateAssignmentExpression(struct node *node,
+                                         struct history *history) {
+  codegenGenerateExpressionable(
+      node->exp.right,
+      historyDown(history,
+                  EXPRESSION_IS_ASSIGNMENT | IS_RIGHT_OPERAND_OF_ASSIGNMENT));
+  codegenGenerateAssignmentPart(node->exp.left, node->exp.op, history);
+}
+void codegenGenerateExpNode(struct node *node, struct history *history) {
+  if (isNodeAssignment(node)) {
+    codegenGenerateAssignmentExpression(node, history);
+  }
+}
 void codegenGenerateStatement(struct node *node, struct history *history) {
   switch (node->type) {
+  case NODE_TYPE_EXPRESSION:
+    codegenGenerateExpNode(node, historyBegin(history->flags));
+    break;
   case NODE_TYPE_VARIABLE:
     codegenGenerateScopeVariable(node);
     break;
