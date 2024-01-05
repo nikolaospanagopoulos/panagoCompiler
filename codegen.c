@@ -2,6 +2,7 @@
 #include "compiler.h"
 #include "node.h"
 #include "vector.h"
+#include <complex.h>
 #include <inttypes.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -25,6 +26,63 @@ static struct node *currentFunction = NULL;
 static struct history {
   int flags;
 } history;
+
+enum {
+  RESPONSE_FLAG_ACKNOWLEDGED = 0b00000001,
+  RESPONSE_FLAG_PUSHED_STRUCTURE = 0b00000010,
+  RESPONSE_FLAG_RESOLVED_ENTITY = 0b00000100,
+  RESPONSE_FLAG_UNARY_GET_ADDRESS = 0b00001000,
+};
+#define RESPONSE_SET(x) &(struct response{x})
+#define RESPONSE_EMPTY_RESPONSE_SET()
+
+struct responseData {
+  union {
+    struct resolverEntity *resolvedEntity;
+  };
+};
+
+struct response {
+  int flags;
+  struct responseData data;
+};
+
+void codegenResponseExpect() {
+  struct response *res = calloc(1, sizeof(struct response));
+  vector_push(currentProcess->generator->responses, &res);
+}
+
+struct responseData *codegenResponseData(struct response *res) {
+  return &res->data;
+}
+
+struct response *codegenResponsePull() {
+  struct response *res =
+      vector_back_ptr_or_null(currentProcess->generator->responses);
+  if (res) {
+    vector_pop(currentProcess->generator->responses);
+  }
+  return res;
+}
+void codegenResponseAknowledge(struct response *responseIn) {
+  struct response *res =
+      vector_back_or_null(currentProcess->generator->responses);
+  if (res) {
+    res->flags |= responseIn->flags;
+    if (responseIn->data.resolvedEntity) {
+      res->data.resolvedEntity = responseIn->data.resolvedEntity;
+    }
+    res->flags |= RESPONSE_FLAG_ACKNOWLEDGED;
+  }
+}
+bool codegenResponseAknowledged(struct response *res) {
+  return res && res->flags & RESPONSE_FLAG_ACKNOWLEDGED;
+}
+
+bool codegenResponseHasEntity(struct response *res) {
+  return codegenResponseAknowledged(res) &&
+         res->flags & RESPONSE_FLAG_RESOLVED_ENTITY && res->data.resolvedEntity;
+}
 
 static struct history *historyBegin(int flags) {
   struct history *history = calloc(1, sizeof(struct history));
@@ -565,10 +623,146 @@ void codegenGenerateAssignmentExpression(struct node *node,
                   EXPRESSION_IS_ASSIGNMENT | IS_RIGHT_OPERAND_OF_ASSIGNMENT));
   codegenGenerateAssignmentPart(node->exp.left, node->exp.op, history);
 }
+void codegenGenerateEntityAccessForEntity(struct resolverResult *result,
+                                          struct resolverEntity *entity,
+                                          struct history *history) {
+
+  switch (entity->type) {
+
+  case RESOLVER_ENTITY_TYPE_ARRAY_BRACKET:
+    break;
+  case RESOLVER_ENTITY_TYPE_VARIABLE:
+  case RESOLVER_ENTITY_TYPE_GENERAL:
+    codegenGenerateEntityAccessForVariableOrGeneral(result, entity);
+    break;
+  case RESOLVER_ENTITY_TYPE_FUNCTION_CALL:
+    break;
+  case RESOLVER_ENTITY_TYPE_UNARY_INDIRECTION:
+    break;
+  case RESOLVER_ENTITY_TYPE_UNARY_GET_ADDRESS:
+    break;
+  case RESOLVER_ENTITY_TYPE_UNSUPPORTED:
+    break;
+  case RESOLVER_ENTITY_TYPE_CAST:
+    break;
+  default:
+    compilerError(currentProcess, "CompilerBug\n");
+  }
+}
+void codegenGenerateEntityAccess(struct resolverResult *result,
+                                 struct resolverEntity *rootAssignmentEntity,
+                                 struct node *topMostNode,
+                                 struct history *history) {
+  codegenGenerateEntityAccessStart(result, rootAssignmentEntity, history);
+  struct resolverEntity *current =
+      resolverResultEntityNext(rootAssignmentEntity);
+  while (current) {
+    codegenGenerateEntityAccessForEntity(result, current, history);
+    current = resolverResultEntityNext(current);
+  }
+}
+bool codegenResolveNodeReturnResult(struct node *node, struct history *history,
+                                    struct resolverResult **resultOut) {
+  struct resolverResult *result =
+      resolverFollow(currentProcess->resolver, node);
+  if (resolverResultOK(result)) {
+    struct resolverEntity *rootAssignmentEntity =
+        resolverResultEntityRoot(result);
+    codegenGenerateEntityAccess(result, rootAssignmentEntity, node, history);
+    if (resultOut) {
+      *resultOut = result;
+    }
+    codegenResponseAknowledge(
+        &(struct response){.flags = RESPONSE_FLAG_RESOLVED_ENTITY,
+                           .data.resolvedEntity = result->lastEntity});
+    return true;
+  }
+  return false;
+}
+bool codegenResolveNodeForValue(struct node *node, struct history *history) {
+  struct resolverResult *result = NULL;
+  if (!codegenResolveNodeReturnResult(node, history, &result)) {
+  }
+}
+int getAdditionalFlags(int currentFlags, struct node *node) {
+  if (node->type != NODE_TYPE_EXPRESSION) {
+    return 0;
+  }
+  int additionalFlags = 0;
+  bool maintainFunctionCallArgumentFlag =
+      (currentFlags & EXPRESSION_IN_FUNCTION_CALL_ARGUMENTS) &&
+      S_EQ(node->exp.op, ",");
+  if (maintainFunctionCallArgumentFlag) {
+    additionalFlags |= EXPRESSION_IN_FUNCTION_CALL_ARGUMENTS;
+  }
+  return additionalFlags;
+}
+int codegenSetFlagForOperator(const char *op) {
+  int flag = 0;
+  if (S_EQ(op, "+")) {
+    flag |= EXPRESSION_IS_ADDITION;
+  } else if (S_EQ(op, "-")) {
+    flag |= EXPRESSION_IS_SUBTRACTION;
+  } else if (S_EQ(op, "*")) {
+    flag |= EXPRESSION_IS_MULTIPLICATION;
+  } else if (S_EQ(op, "/")) {
+    flag |= EXPRESSION_IS_DIVISION;
+  } else if (S_EQ(op, "%")) {
+    flag |= EXPRESSION_IS_MODULAS;
+  } else if (S_EQ(op, ">")) {
+    flag |= EXPRESSION_IS_ABOVE;
+  } else if (S_EQ(op, "<")) {
+    flag |= EXPRESSION_IS_BELOW;
+  } else if (S_EQ(op, ">=")) {
+    flag |= EXPRESSION_IS_ABOVE_OR_EQUAL;
+  } else if (S_EQ(op, "<=")) {
+    flag |= EXPRESSION_IS_BELOW_OR_EQUAL;
+  } else if (S_EQ(op, "!=")) {
+    flag |= EXPRESSION_IS_NOT_EQUAL;
+  } else if (S_EQ(op, "==")) {
+    flag |= EXPRESSION_IS_EQUAL;
+  } else if (S_EQ(op, "&&")) {
+    flag |= EXPRESSION_LOGICAL_AND;
+  } else if (S_EQ(op, "<<")) {
+    flag |= EXPRESSION_IS_BITSHIFT_LEFT;
+  } else if (S_EQ(op, ">>")) {
+    flag |= EXPRESSION_IS_BITSHIFT_RIGHT;
+  } else if (S_EQ(op, "&")) {
+    flag |= EXPRESSION_IS_BITWISE_AND;
+  } else if (S_EQ(op, "|")) {
+    flag |= EXPRESSION_IS_BITWISE_OR;
+  } else if (S_EQ(op, "^")) {
+    flag |= EXPRESSION_IS_BITWISE_XOR;
+  }
+  return flag;
+}
+void codegenGenerateExpNodeForArithmentic(struct node *node,
+                                          struct history *history) {
+  if (node->type != NODE_TYPE_EXPRESSION) {
+    compilerError(currentProcess, "Not an expression \n");
+  }
+  int flags = history->flags;
+  /*
+  if(isLogicalOperator(node->exp.op)){
+
+  }
+  */
+  struct node *leftNode = node->exp.left;
+  struct node *rightNode = node->exp.right;
+
+  int opFlags = codegenSetFlagForOperator(node->exp.op);
+}
 void codegenGenerateExpNode(struct node *node, struct history *history) {
   if (isNodeAssignment(node)) {
     codegenGenerateAssignmentExpression(node, history);
+    return;
   }
+  if (codegenResolveNodeForValue(node, history)) {
+    return;
+  }
+  int additionalFlags = getAdditionalFlags(history->flags, node);
+
+  codegenGenerateExpNodeForArithmentic();
 }
 void codegenGenerateStatement(struct node *node, struct history *history) {
   switch (node->type) {
@@ -658,6 +852,7 @@ struct codeGenerator *codegenNew(struct compileProcess *process) {
   struct codeGenerator *generator = calloc(1, sizeof(struct codeGenerator));
   generator->entryPoints = vector_create(sizeof(struct codegenEntryPoint *));
   generator->exitPoints = vector_create(sizeof(struct codegenExitPoint *));
+  generator->responses = vector_create(sizeof(struct response *));
   generator->stringTable = vector_create(sizeof(struct stringTableElement *));
   return generator;
 }

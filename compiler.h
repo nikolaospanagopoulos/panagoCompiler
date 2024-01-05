@@ -206,6 +206,7 @@ struct codeGenerator {
   struct vector *stringTable;
   struct vector *entryPoints;
   struct vector *exitPoints;
+  struct vector *responses;
 };
 
 enum {
@@ -363,7 +364,7 @@ struct resolverEntity {
   // the offset from the base ptr
   int offset;
 
-  // the node the entiry is relating to
+  // the node the entity is relating to
   struct node *node;
 
   union {
@@ -605,3 +606,5 @@ struct resolverResult *resolverFollow(struct resolverProcess *resolver,
 bool resolverResultOK(struct resolverResult *result);
 struct resolverEntity *resolverResultEntityRoot(struct resolverResult *result);
 struct resolverEntity *resolverResultEntityNext(struct resolverEntity *entity);
+struct resolverResult *resolverFollow(struct resolverProcess *resolver,
+                                      struct node *node);

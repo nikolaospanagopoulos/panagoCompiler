@@ -99,9 +99,10 @@ void freeCustomEntitiesVector(struct vector *vecOfCustomEntities) {
 void codegenFree(compileProcess *process) {
   vector_free(process->generator->exitPoints);
   vector_free(process->generator->entryPoints);
-  // freeVectorStringTable(process->generator->stringTable);
   freeVectorContents(process->generator->stringTable);
   vector_free(process->generator->stringTable);
+  freeVectorContents(process->generator->responses);
+  vector_free(process->generator->responses);
   free(process->generator);
 }
 
