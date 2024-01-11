@@ -5,17 +5,15 @@
 #include <complex.h>
 #include <inttypes.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 static struct compileProcess *currentProcess = NULL;
-
 void codegenNewScope(int flags) {
   resolverDefaultNewScope(currentProcess->resolver, flags);
 }
-
 void codegenFinishScope() {
   resolverDefaultFinishScope(currentProcess->resolver);
 }
@@ -36,6 +34,7 @@ enum {
 #define RESPONSE_SET(x) &(struct response{x})
 #define RESPONSE_EMPTY_RESPONSE_SET()
 
+void codegenGenerateExpNode(struct node *node, struct history *history);
 struct responseData {
   union {
     struct resolverEntity *resolvedEntity;
@@ -352,14 +351,14 @@ void codegenStackSubWithName(size_t stackSize, const char *name) {
   if (stackSize != 0) {
     stackframeSub(currentFunction, STACK_FRAME_ELEMENT_TYPE_UNKNOWN, name,
                   stackSize);
-    asmPush("sub esp %lld", stackSize);
+    asmPush("sub esp, %lld", stackSize);
   }
 }
 void codegenStackAddWithName(size_t stackSize, const char *name) {
   if (stackSize != 0) {
     stackframeAdd(currentFunction, STACK_FRAME_ELEMENT_TYPE_UNKNOWN, name,
                   stackSize);
-    asmPush("add esp %lld", stackSize);
+    asmPush("add esp, %lld", stackSize);
   }
 }
 
@@ -408,6 +407,9 @@ void codegenGenerateExpressionable(struct node *node, struct history *history) {
   switch (node->type) {
   case NODE_TYPE_NUMBER:
     codegenGenerateNumberNode(node, history);
+    break;
+  case NODE_TYPE_EXPRESSION:
+    codegenGenerateExpNode(node, history);
     break;
   }
 }
@@ -682,7 +684,9 @@ bool codegenResolveNodeReturnResult(struct node *node, struct history *history,
 bool codegenResolveNodeForValue(struct node *node, struct history *history) {
   struct resolverResult *result = NULL;
   if (!codegenResolveNodeReturnResult(node, history, &result)) {
+    return false;
   }
+  return true;
 }
 int getAdditionalFlags(int currentFlags, struct node *node) {
   if (node->type != NODE_TYPE_EXPRESSION) {
@@ -736,6 +740,95 @@ int codegenSetFlagForOperator(const char *op) {
   }
   return flag;
 }
+
+struct stackFrameElement *asmStackBack() {
+  return stackframeBack(currentFunction);
+}
+
+struct stackFrameElement *asmStackPeak() {
+  return stackframePeek(currentFunction);
+}
+
+void asmStackPeekStart() { stackFramePeekStart(currentFunction); }
+
+bool asmDatatypeBack(struct datatype *dtypeOut) {
+  struct stackFrameElement *lastStackFrameElement = asmStackBack();
+  if (!lastStackFrameElement) {
+    return false;
+  }
+  if (!(lastStackFrameElement->flags & STACK_FRAME_ELEMENT_FLAG_HAS_DATATYPE)) {
+    return false;
+  }
+  *dtypeOut = lastStackFrameElement->data.dtype;
+  return true;
+}
+
+bool codegenCanGenMath(int flags) { return flags & EXPRESSION_GEN_MATHABLE; }
+
+void codegenGenCmp(const char *value, const char *setIns) {
+
+  asmPush("cmp eax, %s", value);
+  asmPush("%s al", setIns);
+  asmPush("movzx eax, al");
+}
+
+void codegenGenMathForValue(const char *reg, const char *value, int flags,
+                            bool isSigned) {
+  if (flags & EXPRESSION_IS_ADDITION) {
+    asmPush("add %s, %s", reg, value);
+  } else if (flags & EXPRESSION_IS_SUBTRACTION) {
+    asmPush("sub %s, %s", reg, value);
+  } else if (flags & EXPRESSION_IS_MULTIPLICATION) {
+    asmPush("mov ecx, %s", value);
+    if (isSigned) {
+      asmPush("imul ecx");
+    } else {
+      asmPush("mul ecx");
+    }
+  } else if (flags & EXPRESSION_IS_DIVISION) {
+    asmPush("mov ecx, %s", value);
+    asmPush("cdq");
+    if (isSigned) {
+      asmPush("idiv ecx");
+    } else {
+      asmPush("div ecx");
+    }
+  } else if (flags & EXPRESSION_IS_MODULAS) {
+    asmPush("mov ecx, %s", value);
+    asmPush("cdq");
+    if (isSigned) {
+      asmPush("idiv ecx");
+    } else {
+      asmPush("div ecx");
+    }
+    asmPush("mov eax, edx");
+  } else if (flags & EXPRESSION_IS_ABOVE) {
+    codegenGenCmp(value, "setg");
+  } else if (flags & EXPRESSION_IS_BELOW) {
+    codegenGenCmp(value, "setl");
+  } else if (flags & EXPRESSION_IS_EQUAL) {
+    codegenGenCmp(value, "sete");
+  } else if (flags & EXPRESSION_IS_ABOVE_OR_EQUAL) {
+    codegenGenCmp(value, "setge");
+  } else if (flags & EXPRESSION_IS_BELOW_OR_EQUAL) {
+    codegenGenCmp(value, "setle");
+  } else if (flags & EXPRESSION_IS_NOT_EQUAL) {
+    codegenGenCmp(value, "setne");
+  } else if (flags & EXPRESSION_IS_BITSHIFT_LEFT) {
+    value = codegenSubRegister(value, DATA_SIZE_BYTE);
+    asmPush("sal %s, %s", reg, value);
+  } else if (flags & EXPRESSION_IS_BITSHIFT_RIGHT) {
+    value = codegenSubRegister(value, DATA_SIZE_BYTE);
+    asmPush("sar %s, %s", reg, value);
+  } else if (flags & EXPRESSION_IS_BITWISE_AND) {
+    asmPush("and %s, %s", reg, value);
+  } else if (flags & EXPRESSION_IS_BITWISE_OR) {
+    asmPush("or %s, %s", reg, value);
+  } else if (flags & EXPRESSION_IS_BITWISE_OR) {
+    asmPush("xor %s, %s", reg, value);
+  }
+}
+
 void codegenGenerateExpNodeForArithmentic(struct node *node,
                                           struct history *history) {
   if (node->type != NODE_TYPE_EXPRESSION) {
@@ -751,6 +844,30 @@ void codegenGenerateExpNodeForArithmentic(struct node *node,
   struct node *rightNode = node->exp.right;
 
   int opFlags = codegenSetFlagForOperator(node->exp.op);
+  codegenGenerateExpressionable(leftNode, historyDown(history, flags));
+  codegenGenerateExpressionable(rightNode, historyDown(history, flags));
+  struct datatype lastDtype = datatypeForNumeric();
+  asmDatatypeBack(&lastDtype);
+  if (codegenCanGenMath(opFlags)) {
+    struct datatype rightDtype = datatypeForNumeric();
+    asmDatatypeBack(&rightDtype);
+    asmPushInsPop("ecx", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE, "result_value");
+    if (lastDtype.flags & DATATYPE_FLAG_IS_LITERAL) {
+      asmDatatypeBack(&lastDtype);
+    }
+    struct datatype leftDtype = datatypeForNumeric();
+    asmDatatypeBack(&leftDtype);
+    asmPushInsPop("eax", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE, "result_value");
+
+    codegenGenMathForValue("eax", "ecx", opFlags,
+                           lastDtype.flags & DATATYPE_FLAG_IS_SIGNED);
+  }
+  asmPushInsPushWithData("eax", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE,
+                         "result_value", 0,
+                         &(struct stackFrameData){.dtype = lastDtype});
+}
+int codegenRemoveUninheritableFlags(int flags) {
+  return flags & ~EXPRESSION_UNINHERITABLE_FLAGS;
 }
 void codegenGenerateExpNode(struct node *node, struct history *history) {
   if (isNodeAssignment(node)) {
@@ -762,7 +879,10 @@ void codegenGenerateExpNode(struct node *node, struct history *history) {
   }
   int additionalFlags = getAdditionalFlags(history->flags, node);
 
-  codegenGenerateExpNodeForArithmentic();
+  codegenGenerateExpNodeForArithmentic(
+      node,
+      historyDown(history, codegenRemoveUninheritableFlags(history->flags) |
+                               additionalFlags));
 }
 void codegenGenerateStatement(struct node *node, struct history *history) {
   switch (node->type) {

@@ -11,14 +11,19 @@ global dd
 dd:
 push ebp
 mov ebp, esp
-sub esp 16
+sub esp, 16
 push dword 777
 pop eax
 mov dword [ebp-4], eax
 push dword 20
+push dword 10
+pop ecx
+pop eax
+add eax, ecx
+push eax
 pop eax
 mov dword [ebp-4], eax
-add esp 16
+add esp, 16
 pop ebp
 ret
 section .rodata
