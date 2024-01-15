@@ -1,6 +1,5 @@
 int x = 540;
-const char *name = "nikos";
-void dd() {
+int main() {
   int b = 777;
   b = 20 + 10;
 }

@@ -69,6 +69,12 @@ enum {
   NODE_FLAG_HAS_VARIABLE_COMBINED = 0b00000100
 };
 
+enum {
+  COMPILE_PROCESS_EXECUTE_NASM = 0b00000001,
+  COMPILE_PROCESS_EXPORT_AS_OBJECT = 0b00000010,
+
+};
+
 typedef struct lexProcess {
   pos pos;
   struct vector *tokenVec;
