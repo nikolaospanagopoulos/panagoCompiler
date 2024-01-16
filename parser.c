@@ -601,6 +601,11 @@ void parserInitDatatypeTypeAndSize(token *datatypeToken,
   default:
     compilerError(currentProcess, "Unsupported datatype expectation \n");
   }
+
+  if (ptrDepth > 0) {
+    typeOut->flags |= DATATYPE_FLAG_IS_POINTER;
+    typeOut->ptrDepth = ptrDepth;
+  }
 }
 void parserDatatypeInit(token *datatypeToken, token *datatypeSecToken,
                         datatype *typeOut, int ptrDepth, int expectedType) {
