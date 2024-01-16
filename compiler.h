@@ -638,3 +638,7 @@ struct resolverEntity *resolverResultEntityRoot(struct resolverResult *result);
 struct resolverEntity *resolverResultEntityNext(struct resolverEntity *entity);
 struct resolverResult *resolverFollow(struct resolverProcess *resolver,
                                       struct node *node);
+struct resolverEntity *resolverResultEntity(struct resolverResult *result);
+struct resolverDefaultEntityData *
+codegenEntityPrivate(struct resolverEntity *entity);
+const char *codegenSubRegister(const char *originalRegister, size_t size);

@@ -398,6 +398,61 @@ bool codegenIsExpRootForFlags(int flags) {
 bool codegenIsExpRoot(struct history *history) {
   return codegenIsExpRootForFlags(history->flags);
 }
+
+void codegenReduceRegister(const char *reg, size_t size, bool isSigned) {
+  if (size != DATA_SIZE_DWORD) {
+    const char *ins = "movsx";
+    if (!isSigned) {
+      ins = "movzx";
+    }
+    asmPush("%s eax, %s", codegenSubRegister("eax", size));
+  }
+}
+
+void codegenGenerateMemoryAccess(struct node *node, int flags,
+                                 struct resolverEntity *entity) {
+  if (datatypeElementSize(&entity->dtype) != DATA_SIZE_DWORD) {
+    asmPush("mov eax, [%s]", codegenEntityPrivate(entity)->address);
+    codegenReduceRegister("eax", datatypeElementSize(&entity->dtype),
+                          entity->dtype.flags & DATATYPE_FLAG_IS_SIGNED);
+    asmPushInsPushWithData("eax", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE,
+                           "result_value", 0,
+                           &(struct stackFrameData){.dtype = entity->dtype});
+  } else {
+    // push straigt to stack
+    asmPushInsPushWithData("dword [%s]", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE,
+                           "result_value", 0,
+                           &(struct stackFrameData){.dtype = entity->dtype},
+                           codegenEntityPrivate(entity)->address);
+  }
+}
+
+void codegenGenerateVariableAccessForEntity(struct node *node,
+                                            struct resolverEntity *entity,
+                                            struct history *history) {
+  codegenGenerateMemoryAccess(node, history->flags, entity);
+}
+
+void codegenGenerateVariableAccess(struct node *node,
+                                   struct resolverEntity *entity,
+                                   struct history *history) {
+  codegenGenerateVariableAccessForEntity(node, entity,
+                                         historyDown(history, history->flags));
+}
+
+void codegenGenerateIdentifier(struct node *node, struct history *history) {
+  struct resolverResult *result =
+      resolverFollow(currentProcess->resolver, node);
+  if (!resolverResultOK(result)) {
+    compilerError(currentProcess,
+                  "There was a problem resolving the identifier \n");
+  }
+  struct resolverEntity *entity = resolverResultEntity(result);
+  codegenGenerateVariableAccess(node, entity, history);
+  codegenResponseAknowledge(&(struct response){
+      .flags = RESPONSE_FLAG_RESOLVED_ENTITY, .data.resolvedEntity = entity});
+}
+
 void codegenGenerateExpressionable(struct node *node, struct history *history) {
   bool isRoot = codegenIsExpRoot(history);
   if (isRoot) {
@@ -405,6 +460,9 @@ void codegenGenerateExpressionable(struct node *node, struct history *history) {
   }
 
   switch (node->type) {
+  case NODE_TYPE_IDENTIFIER:
+    codegenGenerateIdentifier(node, history);
+    break;
   case NODE_TYPE_NUMBER:
     codegenGenerateNumberNode(node, history);
     break;
