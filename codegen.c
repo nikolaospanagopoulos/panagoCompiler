@@ -887,6 +887,17 @@ void codegenGenMathForValue(const char *reg, const char *value, int flags,
   }
 }
 
+struct datatype *datatypePointerReduce(struct datatype *dtype, int by) {
+  struct datatype *newDatatype = calloc(1, sizeof(struct datatype));
+  memcpy(newDatatype, dtype, sizeof(struct datatype));
+  newDatatype->ptrDepth -= by;
+  if (newDatatype->ptrDepth <= 0) {
+    newDatatype->flags &= ~DATATYPE_FLAG_IS_POINTER;
+    newDatatype->ptrDepth = 0;
+  }
+  vector_push(currentProcess->gb, &newDatatype);
+  return newDatatype;
+}
 void codegenGenerateExpNodeForArithmentic(struct node *node,
                                           struct history *history) {
   if (node->type != NODE_TYPE_EXPRESSION) {
@@ -916,6 +927,19 @@ void codegenGenerateExpNodeForArithmentic(struct node *node,
     struct datatype leftDtype = datatypeForNumeric();
     asmDatatypeBack(&leftDtype);
     asmPushInsPop("eax", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE, "result_value");
+
+    struct datatype *pointerDatatype =
+        datatypeThatsAPointer(&leftDtype, &rightDtype);
+
+    if (pointerDatatype && datatypeSize(datatypePointerReduce(
+                               pointerDatatype, 1)) > DATA_SIZE_BYTE) {
+      const char *reg = "ecx";
+      if (pointerDatatype == &rightDtype) {
+        reg = "eax";
+      }
+      asmPush("imul %s, %i", reg,
+              datatypeSize(datatypePointerReduce(pointerDatatype, 1)));
+    }
 
     codegenGenMathForValue("eax", "ecx", opFlags,
                            lastDtype.flags & DATATYPE_FLAG_IS_SIGNED);

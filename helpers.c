@@ -39,6 +39,17 @@ size_t variableSizeForList(struct node *varListNode) {
   return size;
 }
 
+struct datatype *datatypeThatsAPointer(struct datatype *d1,
+                                       struct datatype *d2) {
+  if (d1->flags & DATATYPE_FLAG_IS_POINTER) {
+    return d1;
+  }
+  if (d2->flags & DATATYPE_FLAG_IS_POINTER) {
+    return d2;
+  }
+  return NULL;
+}
+
 int padding(int val, int to) {
   if (to <= 0) {
     return 0;

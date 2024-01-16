@@ -642,3 +642,5 @@ struct resolverEntity *resolverResultEntity(struct resolverResult *result);
 struct resolverDefaultEntityData *
 codegenEntityPrivate(struct resolverEntity *entity);
 const char *codegenSubRegister(const char *originalRegister, size_t size);
+struct datatype *datatypeThatsAPointer(struct datatype *d1,
+                                       struct datatype *d2);
