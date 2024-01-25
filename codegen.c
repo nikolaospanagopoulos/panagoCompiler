@@ -21,8 +21,17 @@ int codegenLabelCount();
 const char *codegenRegisterString(const char *str);
 static struct node *currentFunction = NULL;
 
+struct historyExp {
+  const char *logicalStartOp;
+  char logicalEndLabel[20];
+  char logicalEndLabelPositive[20];
+};
+
 static struct history {
   int flags;
+  union {
+    struct historyExp exp;
+  };
 } history;
 
 enum {
@@ -898,17 +907,90 @@ struct datatype *datatypePointerReduce(struct datatype *dtype, int by) {
   vector_push(currentProcess->gb, &newDatatype);
   return newDatatype;
 }
+void codegenSetupNewLogicalExpression(struct node *node,
+                                      struct history *history) {
+
+  int labelIndex = codegenLabelCount();
+  sprintf(history->exp.logicalEndLabel, ".endc_%i", labelIndex);
+  sprintf(history->exp.logicalEndLabelPositive, "endc_%i_positive", labelIndex);
+  history->exp.logicalStartOp = node->exp.op;
+  history->flags |= EXPRESSION_IN_LOGICAL_EXPRESSION;
+}
+
+void codegenGenerateLocalCmpAnd(const char *reg, const char *failedLabel) {
+  asmPush("cmp %s, 0", reg);
+  asmPush("je %s", failedLabel);
+}
+void codegenGenerateLogicalCmpOr(const char *reg, const char *failedLabel) {
+  asmPush("cmp %s, 0", reg);
+  asmPush("jg %s", failedLabel);
+}
+
+void codegenGenerateLogicalCmp(const char *op, const char *failLabel,
+                               const char *equalLabel) {
+  if (S_EQ(op, "&&")) {
+    codegenGenerateLocalCmpAnd("eax", failLabel);
+  } else if (S_EQ(op, "||")) {
+    codegenGenerateLogicalCmpOr("eax", failLabel);
+  }
+}
+
+void codegenGenerateEndLabelsForLogicalExpression(
+    const char *op, const char *endLabel, const char *endLabelPositive) {
+  if (S_EQ(op, "&&")) {
+    asmPush("; && END CLAUSE");
+    asmPush("mov eax, 1");
+    asmPush("jmp %s", endLabelPositive);
+    asmPush("%s:", endLabel);
+    asmPush("xor eax, eax");
+    asmPush("%s:", endLabelPositive);
+  } else if (S_EQ(op, "||")) {
+    asmPush("; || END CLAUSE");
+    asmPush("jmp %s", endLabel);
+    asmPush("%s:", endLabelPositive);
+    asmPush("mov eax, 1");
+    asmPush("%s:", endLabel);
+  }
+}
+void codegenGenerateExpNodeForLogicalArithmetic(struct node *node,
+                                                struct history *history) {
+  bool startOfLogicalExpression =
+      !(history->flags & EXPRESSION_IN_LOGICAL_EXPRESSION);
+
+  if (startOfLogicalExpression) {
+    codegenSetupNewLogicalExpression(node, history);
+  }
+  codegenGenerateExpressionable(
+      node->exp.left,
+      historyDown(history, history->flags | EXPRESSION_IN_LOGICAL_EXPRESSION));
+  asmPushInsPop("eax", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE, "result_value");
+  codegenGenerateLogicalCmp(node->exp.op, history->exp.logicalEndLabel,
+                            history->exp.logicalEndLabelPositive);
+  codegenGenerateExpressionable(
+      node->exp.right,
+      historyDown(history, history->flags | EXPRESSION_IN_LOGICAL_EXPRESSION));
+  if (!isLogicalNode(node->exp.right)) {
+    asmPushInsPop("eax", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE, "result_value");
+    codegenGenerateLogicalCmp(node->exp.op, history->exp.logicalEndLabel,
+                              history->exp.logicalEndLabelPositive);
+    codegenGenerateEndLabelsForLogicalExpression(
+        node->exp.op, history->exp.logicalEndLabel,
+        history->exp.logicalEndLabelPositive);
+    asmPushInsPush("eax", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE,
+                   "result_value");
+  }
+}
+
 void codegenGenerateExpNodeForArithmentic(struct node *node,
                                           struct history *history) {
   if (node->type != NODE_TYPE_EXPRESSION) {
     compilerError(currentProcess, "Not an expression \n");
   }
   int flags = history->flags;
-  /*
-  if(isLogicalOperator(node->exp.op)){
-
+  if (isLogicalOperator(node->exp.op)) {
+    codegenGenerateExpNodeForLogicalArithmetic(node, history);
+    return;
   }
-  */
   struct node *leftNode = node->exp.left;
   struct node *rightNode = node->exp.right;
 

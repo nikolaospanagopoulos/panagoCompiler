@@ -204,9 +204,9 @@ enum {
    EXPRESSION_IS_ABOVE_OR_EQUAL | EXPRESSION_IS_BELOW |                        \
    EXPRESSION_IS_BELOW_OR_EQUAL | EXPRESSION_IS_EQUAL |                        \
    EXPRESSION_IS_NOT_EQUAL | EXPRESSION_LOGICAL_AND | EXPRESSION_LOGICAL_OR |  \
-   EXPRESSION_IN_LOGICAL_EXPRESSION | EXPRESSION_IS_BITSHIFT_LEFT |            \
-   EXPRESSION_IS_BITSHIFT_RIGHT | EXPRESSION_IS_BITWISE_OR |                   \
-   EXPRESSION_IS_BITWISE_AND | EXPRESSION_IS_BITWISE_XOR)
+   EXPRESSION_IS_BITSHIFT_LEFT | EXPRESSION_IS_BITSHIFT_RIGHT |                \
+   EXPRESSION_IS_BITWISE_OR | EXPRESSION_IS_BITWISE_AND |                      \
+   EXPRESSION_IS_BITWISE_XOR)
 
 #define EXPRESSION_UNINHERITABLE_FLAGS                                         \
   (EXPRESSION_FLAG_RIGHT_NODE | EXPRESSION_IN_FUNCTION_CALL_ARGUMENTS |        \
@@ -644,3 +644,5 @@ codegenEntityPrivate(struct resolverEntity *entity);
 const char *codegenSubRegister(const char *originalRegister, size_t size);
 struct datatype *datatypeThatsAPointer(struct datatype *d1,
                                        struct datatype *d2);
+bool isLogicalOperator(const char *op);
+bool isLogicalNode(struct node *node);

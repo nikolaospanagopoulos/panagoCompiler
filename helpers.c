@@ -22,6 +22,13 @@ size_t variableSize(struct node *varNode) {
   }
   return datatypeSize(&varNode->var.type);
 }
+bool isLogicalOperator(const char *op) {
+  return S_EQ(op, "&&") || S_EQ(op, "||");
+}
+
+bool isLogicalNode(struct node *node) {
+  return node->type == NODE_TYPE_EXPRESSION && isLogicalOperator(node->exp.op);
+}
 
 size_t variableSizeForList(struct node *varListNode) {
   if (varListNode->type != NODE_TYPE_VARIABLE_LIST) {
