@@ -1,4 +1,7 @@
+int test(int a) {}
+
 int main() {
-  int a;
-  a = 1 && 1;
+  int b = 0;
+
+  test(50);
 }

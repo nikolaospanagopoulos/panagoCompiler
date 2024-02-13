@@ -212,7 +212,7 @@ node *nodeShiftChildrenLeft(node *node) {
   return node;
 }
 void parserNodeMoveRightLeftToLeft(struct node *node) {
-  makeExpNode(node->exp.left, node->exp.right, node->exp.op);
+  makeExpNode(node->exp.left, node->exp.right->exp.left, node->exp.op);
   struct node *completedNode = nodePop();
   const char *newOp = node->exp.right->exp.op;
   node->exp.left = completedNode;
@@ -234,9 +234,10 @@ void parserReorderExpressionNode(struct node **nodeOut) {
       node->exp.right->type == NODE_TYPE_EXPRESSION) {
     const char *rightOp = node->exp.right->exp.op;
     if (parserLeftOpHasPriority(node->exp.op, rightOp)) {
-      struct node *nodeC = nodeShiftChildrenLeft(node);
-      parserReorderExpressionNode(&nodeC->exp.left);
-      parserReorderExpressionNode(&nodeC->exp.right);
+      nodeShiftChildrenLeft(node);
+      parserReorderExpressionNode(&node->exp.left);
+
+      parserReorderExpressionNode(&node->exp.right);
     }
   }
   if ((isArrayNode(node->exp.left) && isNodeAssignment(node->exp.right)) ||
@@ -309,7 +310,7 @@ int parseExpressionNormal(history *hs) {
     return -1;
   }
   rightNode->flags |= INSIDE_EXPRESSION;
-  node *lalal = makeExpNode(nodeLeft, rightNode, op);
+  makeExpNode(nodeLeft, rightNode, op);
 
   node *expNode = nodePop();
   parserReorderExpressionNode(&expNode);
@@ -1496,10 +1497,12 @@ int parseExpressionableSingle(history *hs) {
     res = 0;
     break;
   case OPERATOR:
-    res = parseExp(hs);
+    parseExp(hs);
+    res = 0;
     break;
   case KEYWORD:
     parseKeyword(hs);
+    res = 0;
     break;
   case STRING:
     parseString(hs);

@@ -21,7 +21,7 @@ struct stackFrameElement *stackframeBack(struct node *funcNode) {
 }
 void stackFramePeekStart(struct node *funcNode) {
   struct stackFrame *frame = &funcNode->func.frame;
-  vector_set_peek_pointer(frame->elements, 0);
+  vector_set_peek_pointer_end(frame->elements);
   vector_set_flag(frame->elements, VECTOR_FLAG_PEEK_DECREMENT);
 }
 struct stackFrameElement *stackframePeek(struct node *funcNode) {
@@ -46,7 +46,7 @@ void stackFramePopExpecting(struct node *funcNode, int expectingType,
     compilerError(currentProcess,
                   "Stackframe error: last element doesnt exist \n");
   }
-  if (lastElement->type != expectingType ||
+  if (lastElement->type != expectingType &&
       !S_EQ(lastElement->name, expectingName)) {
     compilerError(currentProcess,
                   "Stackframe error: expecting wrong element\n");

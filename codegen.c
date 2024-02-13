@@ -609,6 +609,35 @@ void codegenGenerateEntityAccessForVariableOrGeneral(
                          "result_value", 0,
                          &(struct stackFrameData){.dtype = entity->dtype});
 }
+void codegenGenerateEntityAccessForFunctionCall(struct resolverResult *result,
+                                                struct resolverEntity *entity) {
+  vector_set_flag(entity->funcCallData.arguments, VECTOR_FLAG_PEEK_DECREMENT);
+  vector_set_peek_pointer_end(entity->funcCallData.arguments);
+
+  struct node *node = vector_peek_ptr(entity->funcCallData.arguments);
+  asmPushInsPop("ebx", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE, "result_value");
+  asmPush("mov ecx, ebx");
+  if (datatypeIsStructOrUnionNotPtr(&entity->dtype)) {
+  }
+
+  while (node) {
+    codegenGenerateExpressionable(
+        node, historyBegin(EXPRESSION_IN_FUNCTION_CALL_ARGUMENTS));
+    node = vector_peek_ptr(entity->funcCallData.arguments);
+  }
+  asmPush("call ecx");
+  size_t stack_size = entity->funcCallData.stackSize;
+  if (datatypeIsStructOrUnionNotPtr(&entity->dtype)) {
+    stack_size += DATA_SIZE_DWORD;
+  }
+  codegenStackAdd(stack_size);
+  if (datatypeIsStructOrUnionNotPtr(&entity->dtype)) {
+  } else {
+    asmPushInsPushWithData("eax", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE,
+                           "result_value", 0,
+                           &(struct stackFrameData){.dtype = entity->dtype});
+  }
+}
 void codegenGenerateEntityAccessForEntityAssignmentLeftOperand(
     struct resolverResult *result, struct resolverEntity *entity,
     struct history *history) {
@@ -621,6 +650,7 @@ void codegenGenerateEntityAccessForEntityAssignmentLeftOperand(
     codegenGenerateEntityAccessForVariableOrGeneral(result, entity);
     break;
   case RESOLVER_ENTITY_TYPE_FUNCTION_CALL:
+    codegenGenerateEntityAccessForFunctionCall(result, entity);
     break;
   case RESOLVER_ENTITY_TYPE_UNARY_INDIRECTION:
     break;
@@ -705,6 +735,7 @@ void codegenGenerateEntityAccessForEntity(struct resolverResult *result,
     codegenGenerateEntityAccessForVariableOrGeneral(result, entity);
     break;
   case RESOLVER_ENTITY_TYPE_FUNCTION_CALL:
+    codegenGenerateEntityAccessForFunctionCall(result, entity);
     break;
   case RESOLVER_ENTITY_TYPE_UNARY_INDIRECTION:
     break;
@@ -1048,6 +1079,22 @@ void codegenGenerateExpNode(struct node *node, struct history *history) {
       historyDown(history, codegenRemoveUninheritableFlags(history->flags) |
                                additionalFlags));
 }
+void codegen_discard_unused_stack() {
+  asmStackPeak();
+
+  struct stackFrameElement *element = asmStackPeak();
+  size_t stack_adjustment = 0;
+  while (element) {
+    if (!S_EQ(element->name, "result_value")) {
+      break;
+    }
+
+    stack_adjustment += DATA_SIZE_DWORD;
+    element = asmStackPeak();
+  }
+
+  codegenStackAdd(stack_adjustment);
+}
 void codegenGenerateStatement(struct node *node, struct history *history) {
   switch (node->type) {
   case NODE_TYPE_EXPRESSION:
@@ -1057,6 +1104,7 @@ void codegenGenerateStatement(struct node *node, struct history *history) {
     codegenGenerateScopeVariable(node);
     break;
   }
+  codegen_discard_unused_stack();
 }
 void codegenGenerateScopeNoNewScope(struct vector *statements,
                                     struct history *history) {
