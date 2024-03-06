@@ -1,64 +1,54 @@
-#include "compileProcess.h"
 #include "compiler.h"
-#include "stdio.h"
-#include <stdlib.h>
-#include <string.h>
-
+#include "vector.h"
+#include <stdio.h>
 int main(int argc, char **argv) {
-
-  const char *inputFile = "./test.c";
-
-  const char *outputFile = "./test";
-
+  const char *input_file = "./test.c";
+  const char *output_file = "./test";
   const char *option = "exec";
 
   if (argc > 1) {
-    inputFile = argv[1];
+    input_file = argv[1];
   }
+
   if (argc > 2) {
-    inputFile = argv[2];
+    output_file = argv[2];
   }
+
   if (argc > 3) {
-    inputFile = argv[3];
+    option = argv[3];
   }
-
-  int compileFlags = COMPILE_PROCESS_EXECUTE_NASM;
-
+  int compile_flags = COMPILE_PROCESS_EXECUTE_NASM;
   if (S_EQ(option, "object")) {
-    compileFlags |= COMPILE_PROCESS_EXPORT_AS_OBJECT;
+    compile_flags |= COMPILE_PROCESS_EXPORT_AS_OBJECT;
   }
-
-  int res = compileFile(inputFile, outputFile, compileFlags);
-
+  int res = compile_file(input_file, output_file, compile_flags);
   if (res == COMPILER_FILE_COMPILED_OK) {
-    printf("Compiled successfully \n");
+    printf("everything compiled file\n");
+  } else if (res == COMPILER_FAILED_WITH_ERRORS) {
+    printf("Compile failed\n");
   } else {
-    printf("Compiled with errors \n");
+    printf("Unknown response for compile time\n");
   }
 
-  if (compileFlags & COMPILE_PROCESS_EXECUTE_NASM) {
-    char nasmOutputFile[40];
-    char nasmCmd[512];
-
-    sprintf(nasmOutputFile, "%s.o", outputFile);
-
-    if (compileFlags & COMPILE_PROCESS_EXPORT_AS_OBJECT) {
-
-      sprintf(nasmCmd, "nasm -f elf32 %s -o %s", outputFile, nasmOutputFile);
-
+  if (compile_flags & COMPILE_PROCESS_EXECUTE_NASM) {
+    char nasm_output_file[40];
+    char nasm_cmd[512];
+    sprintf(nasm_output_file, "%s.o", output_file);
+    if (compile_flags & COMPILE_PROCESS_EXPORT_AS_OBJECT) {
+      sprintf(nasm_cmd, "nasm -f elf32 %s -o %s", output_file,
+              nasm_output_file);
     } else {
-      sprintf(nasmCmd, "nasm -f elf32 %s -o %s && gcc -m32 %s -o %s",
-              outputFile, nasmOutputFile, nasmOutputFile, outputFile);
+      sprintf(nasm_cmd, "nasm -f elf32 %s -o %s && gcc -m32 %s -o %s",
+              output_file, nasm_output_file, nasm_output_file, output_file);
     }
 
-    printf("%s\n", nasmCmd);
-    int res = system(nasmCmd);
-
+    printf("%s", nasm_cmd);
+    int res = system(nasm_cmd);
     if (res < 0) {
-      printf("there was an issue \n");
+      printf(
+          "Issue assemblign the assembly file with NASM and linking with gcc");
       return res;
     }
   }
-
   return 0;
 }

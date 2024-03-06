@@ -1,83 +1,93 @@
-#include "fixup.h"
+#include "compiler.h"
 #include "vector.h"
-#include <stddef.h>
 #include <stdlib.h>
-#include <string.h>
-struct fixupSystem *fixupSystemNew() {
-  struct fixupSystem *fxSystem = calloc(1, sizeof(struct fixupSystem));
-  fxSystem->fixups = vector_create(sizeof(struct fixup));
-  return fxSystem;
+
+struct fixup_system *fixup_sys_new() {
+  struct fixup_system *system = calloc(1, sizeof(struct fixup_system));
+  system->fixups = vector_create(sizeof(struct fixup));
+  return system;
 }
-struct fixupConfig *fixupConfig(struct fixup *fixup) { return &fixup->config; }
-void fixupFree(struct fixup *fixup) {
+
+struct fixup_config *fixup_config(struct fixup *fixup) {
+  return &fixup->config;
+}
+
+void fixup_free(struct fixup *fixup) {
   fixup->config.end(fixup);
   free(fixup);
 }
-void fixupStartIteration(struct fixupSystem *system) {
+
+void fixup_start_iteration(struct fixup_system *system) {
   vector_set_peek_pointer(system->fixups, 0);
 }
 
-struct fixup *fixupNext(struct fixupSystem *system) {
+struct fixup *fixup_next(struct fixup_system *system) {
   return vector_peek_ptr(system->fixups);
 }
 
-void fixupSystemFixupsFree(struct fixupSystem *system) {
-  fixupStartIteration(system);
-  struct fixup *fixup = fixupNext(system);
+void fixup_sys_fixups_free(struct fixup_system *system) {
+  fixup_start_iteration(system);
+  struct fixup *fixup = fixup_next(system);
   while (fixup) {
-    fixupFree(fixup);
-    fixup = fixupNext(system);
+    fixup_free(fixup);
+    fixup = fixup_next(system);
   }
 }
 
-void fixupSystemFree(struct fixupSystem *system) {
-  fixupSystemFixupsFree(system);
+void fixup_sys_free(struct fixup_system *system) {
+  fixup_sys_fixups_free(system);
   vector_free(system->fixups);
   free(system);
 }
 
-int fixupSystemUnresolvedFixupsCount(struct fixupSystem *system) {
+int fixup_sys_unresolved_fixups_count(struct fixup_system *system) {
   size_t c = 0;
-  fixupStartIteration(system);
-  struct fixup *fixup = fixupNext(system);
+  fixup_start_iteration(system);
+  struct fixup *fixup = fixup_next(system);
   while (fixup) {
-    if (fixup->flags & FIXUP_RESOLVED_FLAG) {
-      fixup = fixupNext(system);
+    if (fixup->flags & FIXUP_FLAG_RESOLVED) {
+      fixup = fixup_next(system);
       continue;
     }
     c++;
-    fixup = fixupNext(system);
+    fixup = fixup_next(system);
   }
+
   return c;
 }
-struct fixup *fixupRegister(struct fixupSystem *system,
-                            struct fixupConfig *config) {
+
+struct fixup *fixup_register(struct fixup_system *system,
+                             struct fixup_config *config) {
   struct fixup *fixup = calloc(1, sizeof(struct fixup));
-  memcpy(&fixup->config, config, sizeof(struct fixupConfig));
+  memcpy(&fixup->config, config, sizeof(struct fixup_config));
   fixup->system = system;
-  // TODO: maybe have to clean
   vector_push(system->fixups, fixup);
   return fixup;
 }
-void *fixupPrivate(struct fixup *fixup) {
-  return fixupConfig(fixup)->privateData;
-}
-bool fixupResolve(struct fixup *fixup) {
-  if (fixupConfig(fixup)->fix(fixup)) {
-    fixup->flags |= FIXUP_RESOLVED_FLAG;
+
+bool fixup_resolve(struct fixup *fixup) {
+  if (fixup_config(fixup)->fix(fixup)) {
+    fixup->flags |= FIXUP_FLAG_RESOLVED;
     return true;
   }
+
   return false;
 }
-bool fixupsResolve(struct fixupSystem *system) {
-  fixupStartIteration(system);
-  struct fixup *fixup = fixupNext(system);
+
+void *fixup_private(struct fixup *fixup) {
+  return fixup_config(fixup)->private;
+}
+
+bool fixups_resolve(struct fixup_system *system) {
+  fixup_start_iteration(system);
+  struct fixup *fixup = fixup_next(system);
   while (fixup) {
-    if (fixup->flags & FIXUP_RESOLVED_FLAG) {
+    if (fixup->flags & FIXUP_FLAG_RESOLVED) {
       continue;
     }
-    fixupResolve(fixup);
-    fixup = fixupNext(system);
+    fixup_resolve(fixup);
+    fixup = fixup_next(system);
   }
-  return fixupSystemUnresolvedFixupsCount(system) == 0;
+
+  return fixup_sys_unresolved_fixups_count(system) == 0;
 }
