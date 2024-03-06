@@ -1,314 +1,373 @@
-#include "node.h"
-#include "compileProcess.h"
 #include "compiler.h"
 #include "vector.h"
 #include <assert.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
-struct vector *nodeVector = NULL;
-struct vector *nodeVectorRoot = NULL;
+struct vector *node_vector = NULL;
+struct vector *node_vector_root = NULL;
 struct vector *garbage = NULL;
 struct vector *garbageForVector = NULL;
-struct node *parserCurrentBody = NULL;
-struct node *parserCurrentFunction = NULL;
+static struct compile_process *compile_proc;
+struct node *parser_current_body = NULL;
+struct node *parser_current_function = NULL;
 
-void nodeSetVector(struct vector *vec, struct vector *rootVec,
-                   struct vector *garbageVec, struct vector *garbageForVec) {
-  nodeVector = vec;
-  nodeVectorRoot = rootVec;
-  garbage = garbageVec;
-  garbageForVector = garbageForVec;
+void set_compile_process_for_node(struct compile_process *cp) {
+  compile_proc = cp;
 }
 
-void nodePush(node *node) { vector_push(nodeVector, &node); }
-void garpush(node *node) { vector_push(garbage, &node); }
+void node_set_vector(struct vector *vec, struct vector *root_vec,
+                     struct vector *garbage_vec,
+                     struct vector *garbage_for_vector) {
+  node_vector = vec;
+  node_vector_root = root_vec;
+  garbage = garbage_vec;
+  garbageForVector = garbage_for_vector;
+}
 
-node *nodePeekOrNull() { return vector_back_ptr_or_null(nodeVector); }
+void node_push(struct node *node) { vector_push(node_vector, &node); }
+void gar_push(struct node *node) { vector_push(garbage, &node); }
 
-node *nodePeek() { return *(struct node **)(vector_back(nodeVector)); }
+struct node *node_peek_or_null() {
+  return vector_back_ptr_or_null(node_vector);
+}
 
-node *nodePop() {
-  node *lastNode = vector_back_ptr_or_null(nodeVector);
-  node *lastNodeRoot =
-      vector_empty(nodeVector) ? NULL : vector_back_ptr_or_null(nodeVectorRoot);
+struct node *node_peek() { return *(struct node **)(vector_back(node_vector)); }
 
-  vector_pop(nodeVector);
+struct node *node_pop() {
+  struct node *last_node = vector_back_ptr(node_vector);
+  struct node *last_node_root = vector_empty(node_vector)
+                                    ? NULL
+                                    : vector_back_ptr_or_null(node_vector_root);
 
-  if (lastNode == lastNodeRoot) {
-    vector_pop(nodeVectorRoot);
+  vector_pop(node_vector);
+
+  if (last_node == last_node_root) {
+    vector_pop(node_vector_root);
   }
 
-  return lastNode;
+  return last_node;
 }
-bool nodeIsExpressionable(node *node) {
+
+bool node_is_expressionable(struct node *node) {
   return node->type == NODE_TYPE_EXPRESSION ||
          node->type == NODE_TYPE_EXPRESSION_PARENTHESES ||
          node->type == NODE_TYPE_UNARY || node->type == NODE_TYPE_IDENTIFIER ||
          node->type == NODE_TYPE_NUMBER || node->type == NODE_TYPE_STRING;
 }
-node *nodeCreate(node *_node) {
-  node *node = malloc(sizeof(struct node));
-  memcpy(node, _node, sizeof(struct node));
-  node->binded.owner = parserCurrentBody;
-  node->binded.function = parserCurrentFunction;
-  garpush(node);
-  nodePush(node);
 
-  return node;
-}
-node *nodeCreateNotPush(node *_node) {
-  node *node = malloc(sizeof(struct node));
-  memcpy(node, _node, sizeof(struct node));
-  node->varlist.list = NULL;
-  return node;
-}
-node *nodePeekExpressionableOrNull() {
-  node *lastNode = nodePeekOrNull();
-  return nodeIsExpressionable(lastNode) ? lastNode : NULL;
+struct node *node_peek_expressionable_or_null() {
+  struct node *last_node = node_peek_or_null();
+  return node_is_expressionable(last_node) ? last_node : NULL;
 }
 
-node *makeExpNode(node *left, node *right, const char *op) {
-  assert(left);
-  assert(right);
+void make_cast_node(struct datatype *dtype, struct node *operand_node) {
+  node_create(&(struct node){.type = NODE_TYPE_CAST,
+                             .cast.dtype = *dtype,
+                             .cast.operand = operand_node});
+}
 
-  node *tocreate = nodeCreate(&(node){.type = NODE_TYPE_EXPRESSION,
-                                      .exp.left = left,
-                                      .exp.right = right,
-                                      .exp.op = op});
+void make_tenary_node(struct node *true_node, struct node *false_node) {
+  node_create(&(struct node){.type = NODE_TYPE_TENARY,
+                             .tenary.true_node = true_node,
+                             .tenary.false_node = false_node});
+}
 
-  return tocreate;
+void make_case_node(struct node *exp_node) {
+  node_create(&(struct node){.type = NODE_TYPE_STATEMENT_CASE,
+                             .stmt._case.exp = exp_node});
 }
-void makeBracketNode(node *node) {
-  nodeCreate(&(struct node){.type = NODE_TYPE_BRACKET, .bracket.inner = node});
+
+void make_goto_node(struct node *label_node) {
+  node_create(&(struct node){.type = NODE_TYPE_STATEMENT_GOTO,
+                             .stmt._goto.label = label_node});
 }
-void makeBodyNode(struct vector *bodyVec, size_t size, bool padded,
-                  struct node *largestVarNode) {
-  nodeCreate(&(struct node){.type = NODE_TYPE_BODY,
-                            .body.statements = bodyVec,
-                            .body.size = size,
-                            .body.padded = padded,
-                            .body.largestVarNode = largestVarNode});
+
+void make_label_node(struct node *name_node) {
+  node_create(&(struct node){.type = NODE_TYPE_LABEL, .label.name = name_node});
 }
-bool nodeIsStructOrUnionVariable(struct node *node) {
-  if (node->type != NODE_TYPE_VARIABLE) {
-    return false;
+void make_continue_node() {
+  node_create(&(struct node){.type = NODE_TYPE_STATEMENT_CONTINUE});
+}
+
+void make_break_node() {
+  node_create(&(struct node){.type = NODE_TYPE_STATEMENT_BREAK});
+}
+
+void make_exp_node(struct node *left_node, struct node *right_node,
+                   const char *op) {
+  if (!left_node) {
+    compiler_error(compile_proc, "left node doesnt exist \n");
   }
-  return dataTypeIsStructOrUnion(&node->var.type);
-}
-struct node *variableNode(struct node *node) {
-  struct node *varNode = NULL;
-  switch (node->type) {
-  case NODE_TYPE_VARIABLE:
-    varNode = node;
-    break;
-  case NODE_TYPE_STRUCT:
-    varNode = node->_struct.var;
-    break;
-  case NODE_TYPE_UNION:
-    varNode = node->_union.var;
-    break;
+  if (!right_node) {
+    compiler_error(compile_proc, "right node doesnt exist \n");
   }
-  return varNode;
+  node_create(&(struct node){.type = NODE_TYPE_EXPRESSION,
+                             .exp.left = left_node,
+                             .exp.right = right_node,
+                             .exp.op = op});
 }
 
-node *variableNodeOrList(struct node *node) {
-  if (node->type == NODE_TYPE_VARIABLE_LIST) {
-    return node;
-  }
-  return variableNode(node);
+void make_exp_parentheses_node(struct node *exp_node) {
+  node_create(&(struct node){.type = NODE_TYPE_EXPRESSION_PARENTHESES,
+                             .parenthesis.exp = exp_node});
 }
 
-void makeStructNode(const char *name, struct node *bodyNode) {
+void make_bracket_node(struct node *node) {
+  node_create(&(struct node){.type = NODE_TYPE_BRACKET, .bracket.inner = node});
+}
+
+void make_body_node(struct vector *body_vec, size_t size, bool padded,
+                    struct node *largest_var_node) {
+  node_create(&(struct node){.type = NODE_TYPE_BODY,
+                             .body.statements = body_vec,
+                             .body.size = size,
+                             .body.padded = padded,
+                             .body.largest_var_node = largest_var_node});
+}
+
+void make_struct_node(const char *name, struct node *body_node) {
   int flags = 0;
-  if (!bodyNode) {
-    flags |= NODE_FLAG_IS_FORWARD_DECLERATION;
+  if (!body_node) {
+    flags |= NODE_FLAG_IS_FORWARD_DECLARATION;
   }
-  nodeCreate(&(struct node){.type = NODE_TYPE_STRUCT,
-                            ._struct.body_n = bodyNode,
-                            ._struct.name = name,
-                            .flags = flags});
+
+  node_create(&(struct node){.type = NODE_TYPE_STRUCT,
+                             ._struct.body_n = body_node,
+                             ._struct.name = name,
+                             .flags = flags});
 }
-void makeUnionNode(const char *name, struct node *bodyNode) {
+
+void make_union_node(const char *name, struct node *body_node) {
   int flags = 0;
-  if (!bodyNode) {
-    flags |= NODE_FLAG_IS_FORWARD_DECLERATION;
+  if (!body_node) {
+    flags |= NODE_FLAG_IS_FORWARD_DECLARATION;
   }
-  nodeCreate(&(struct node){.type = NODE_TYPE_UNION,
-                            ._union.body_n = bodyNode,
-                            ._union.name = name,
-                            .flags = flags});
-}
-struct node *nodeFromSym(struct symbol *sym) {
-  if (sym->type != SYMBOL_TYPE_NODE) {
-    return NULL;
-  }
-  return sym->data;
-}
-struct node *nodeFromSymbol(compileProcess *process, const char *name) {
-  struct symbol *sym = symresolverGetSymbol(process, name);
-  if (!sym) {
-    return NULL;
-  }
-  return nodeFromSym(sym);
-}
-struct node *structNodeForName(compileProcess *process, const char *name) {
-  struct node *node = nodeFromSymbol(process, name);
-  if (!node) {
-    return NULL;
-  }
-  if (node->type != NODE_TYPE_STRUCT) {
-    return NULL;
-  }
-  return node;
-}
-struct node *unionNodeForName(compileProcess *process, const char *name) {
-  struct node *node = nodeFromSymbol(process, name);
-  if (!node) {
-    return NULL;
-  }
-  if (node->type != NODE_TYPE_UNION) {
-    return NULL;
-  }
-  return node;
+
+  node_create(&(struct node){.type = NODE_TYPE_UNION,
+                             ._union.body_n = body_node,
+                             ._union.name = name,
+                             .flags = flags});
 }
 
-void makeExpParenthesisNode(struct node *expNode) {
-  nodeCreate(
-      &(struct node){.type = NODE_TYPE_EXPRESSION, .parenthesis.exp = expNode});
-}
-void makeFunctionNode(struct datatype *retType, const char *name,
-                      struct vector *arguments, struct node *bodyNode) {
-  struct node *funcNode =
-      nodeCreate(&(struct node){.type = NODE_TYPE_FUNCTION,
-                                .func.name = name,
-                                .func.args.vector = arguments,
-                                .func.bodyN = bodyNode,
-                                .func.rtype = *retType,
-                                .func.args.stackAddition = DATA_SIZE_DDWORD});
-
-  funcNode->func.frame.elements =
-      vector_create(sizeof(struct stackFrameElement));
-
+void make_function_node(struct datatype *ret_type, const char *name,
+                        struct vector *arguments, struct node *body_node) {
+  struct node *function_node =
+      node_create(&(struct node){.type = NODE_TYPE_FUNCTION,
+                                 .func.name = name,
+                                 .func.args.vector = arguments,
+                                 .func.body_n = body_node,
+                                 .func.rtype = *ret_type,
+                                 .func.args.stack_addition = DATA_SIZE_DDWORD});
+  function_node->func.frame.elements =
+      vector_create(sizeof(struct stack_frame_element));
   if (arguments) {
     vector_push(garbageForVector, &arguments);
   }
-  // collect garbage
-  vector_push(garbageForVector, &funcNode->func.frame.elements);
+  vector_push(garbageForVector, &function_node->func.frame.elements);
 }
-bool nodeIsExpressionOrParentheses(struct node *node) {
+
+void make_switch_node(struct node *exp_node, struct node *body_node,
+                      struct vector *cases, bool has_default_case) {
+  node_create(
+      &(struct node){.type = NODE_TYPE_STATEMENT_SWITCH,
+                     .stmt.switch_stmt.exp = exp_node,
+                     .stmt.switch_stmt.body = body_node,
+                     .stmt.switch_stmt.cases = cases,
+                     .stmt.switch_stmt.has_default_case = has_default_case});
+}
+
+void make_do_while_node(struct node *body_node, struct node *exp_node) {
+  node_create(&(struct node){.type = NODE_TYPE_STATEMENT_DO_WHILE,
+                             .stmt.do_while_stmt.body_node = body_node,
+                             .stmt.do_while_stmt.exp_node = exp_node});
+}
+
+void make_while_node(struct node *exp_node, struct node *body_node) {
+  node_create(&(struct node){.type = NODE_TYPE_STATEMENT_WHILE,
+                             .stmt.while_stmt.exp_node = exp_node,
+                             .stmt.while_stmt.body_node = body_node});
+}
+
+void make_for_node(struct node *init_node, struct node *cond_node,
+                   struct node *loop_node, struct node *body_node) {
+  node_create(&(struct node){.type = NODE_TYPE_STATEMENT_FOR,
+                             .stmt.for_stmt.init_node = init_node,
+                             .stmt.for_stmt.cond_node = cond_node,
+                             .stmt.for_stmt.loop_node = loop_node,
+                             .stmt.for_stmt.body_node = body_node});
+}
+
+void make_return_node(struct node *exp_node) {
+  node_create(&(struct node){.type = NODE_TYPE_STATEMENT_RETURN,
+                             .stmt.return_stmt.exp = exp_node});
+}
+
+void make_else_node(struct node *body_node) {
+  node_create(&(struct node){.type = NODE_TYPE_STATEMENT_ELSE,
+                             .stmt.else_stmt.body_node = body_node});
+}
+
+void make_if_node(struct node *cond_node, struct node *body_node,
+                  struct node *next_node) {
+  node_create(&(struct node){.type = NODE_TYPE_STATEMENT_IF,
+                             .stmt.if_stmt.cond_node = cond_node,
+                             .stmt.if_stmt.body_node = body_node,
+                             .stmt.if_stmt.next = next_node});
+}
+
+void make_unary_node(const char *op, struct node *operand_node) {
+  node_create(&(struct node){
+      .type = NODE_TYPE_UNARY, .unary.op = op, .unary.operand = operand_node});
+}
+
+struct node *node_from_sym(struct symbol *sym) {
+  if (sym->type != SYMBOL_TYPE_NODE) {
+    return NULL;
+  }
+
+  return sym->data;
+}
+
+struct node *node_from_symbol(struct compile_process *current_process,
+                              const char *name) {
+  struct symbol *sym = symresolver_get_symbol(current_process, name);
+  if (!sym) {
+    return NULL;
+  }
+  return node_from_sym(sym);
+}
+
+struct node *struct_node_for_name(struct compile_process *current_process,
+                                  const char *name) {
+  struct node *node = node_from_symbol(current_process, name);
+  if (!node)
+    return NULL;
+
+  if (node->type != NODE_TYPE_STRUCT)
+    return NULL;
+
+  return node;
+}
+
+struct node *union_node_for_name(struct compile_process *current_process,
+                                 const char *name) {
+  struct node *node = node_from_symbol(current_process, name);
+  if (!node)
+    return NULL;
+
+  if (node->type != NODE_TYPE_UNION)
+    return NULL;
+
+  return node;
+}
+
+struct node *node_create(struct node *_node) {
+  struct node *node = malloc(sizeof(struct node));
+  memcpy(node, _node, sizeof(struct node));
+  node->binded.owner = parser_current_body;
+  node->binded.function = parser_current_function;
+  gar_push(node);
+  node_push(node);
+  return node;
+}
+
+bool node_is_struct_or_union(struct node *node) {
+  return node->type == NODE_TYPE_STRUCT || node->type == NODE_TYPE_UNION;
+}
+
+bool node_is_struct_or_union_variable(struct node *node) {
+  if (node->type != NODE_TYPE_VARIABLE) {
+    return false;
+  }
+
+  return datatype_is_struct_or_union(&node->var.type);
+}
+
+struct node *variable_node(struct node *node) {
+
+  struct node *var_node = NULL;
+  switch (node->type) {
+  case NODE_TYPE_VARIABLE:
+    var_node = node;
+    break;
+
+  case NODE_TYPE_STRUCT:
+    var_node = node->_struct.var;
+    break;
+
+  case NODE_TYPE_UNION:
+    var_node = node->_union.var;
+    break;
+  }
+
+  return var_node;
+}
+
+bool variable_node_is_primitive(struct node *node) {
+  if (node->type != NODE_TYPE_VARIABLE) {
+    compiler_error(compile_proc, "Not a variable node \n");
+  }
+
+  return datatype_is_primitive(&node->var.type);
+}
+
+struct node *variable_node_or_list(struct node *node) {
+  if (node->type == NODE_TYPE_VARIABLE_LIST) {
+    return node;
+  }
+
+  return variable_node(node);
+}
+
+size_t function_node_argument_stack_addition(struct node *node) {
+
+  if (node->type != NODE_TYPE_FUNCTION) {
+    compiler_error(compile_proc, "Error: not a function node \n");
+  }
+  return node->func.args.stack_addition;
+}
+
+size_t function_node_stack_size(struct node *node) {
+  if (node->type != NODE_TYPE_FUNCTION) {
+    compiler_error(compile_proc, "Error: not a function node \n");
+  }
+  return node->func.stack_size;
+}
+
+bool function_node_is_prototype(struct node *node) {
+  return node->func.body_n == NULL;
+}
+
+struct vector *function_node_argument_vec(struct node *node) {
+  if (node->type != NODE_TYPE_FUNCTION) {
+    compiler_error(compile_proc, "Error: not a function node \n");
+  }
+  return node->func.args.vector;
+}
+bool node_is_expression_or_parentheses(struct node *node) {
   return node->type == NODE_TYPE_EXPRESSION_PARENTHESES ||
          node->type == NODE_TYPE_EXPRESSION;
 }
-bool nodeIsValueType(struct node *node) {
-  return nodeIsExpressionOrParentheses(node) ||
+
+bool node_is_value_type(struct node *node) {
+  return node_is_expression_or_parentheses(node) ||
          node->type == NODE_TYPE_IDENTIFIER || node->type == NODE_TYPE_NUMBER ||
          node->type == NODE_TYPE_UNARY || node->type == NODE_TYPE_TENARY ||
          node->type == NODE_TYPE_STRING;
 }
-void makeIfNode(struct node *condNode, struct node *bodyNode,
-                struct node *nextNode) {
-  nodeCreate(&(struct node){.type = NODE_TYPE_STATEMENT_IF,
-                            .stmt.ifStmt.condNode = condNode,
-                            .stmt.ifStmt.bodyNode = bodyNode,
-                            .stmt.ifStmt.next = nextNode});
-}
-void makeElseNode(struct node *bodyNode) {
-  nodeCreate(&(struct node){.type = NODE_TYPE_STATEMENT_ELSE,
-                            .stmt.ifStmt.bodyNode = bodyNode});
-}
 
-void makeReturnNode(struct node *expNode) {
-  nodeCreate(&(struct node){.type = NODE_TYPE_STATEMENT_RETURN,
-                            .stmt.returnStmt.expression = expNode});
-}
-void makeForNode(struct node *initNode, struct node *condNode,
-                 struct node *loopNode, struct node *bodyNode) {
-  nodeCreate(&(struct node){.type = NODE_TYPE_STATEMENT_FOR,
-                            .stmt.forStmt.initNode = initNode,
-                            .stmt.forStmt.loopNode = loopNode,
-                            .stmt.forStmt.bodyNode = bodyNode});
-}
-void makeWhileNode(struct node *expNode, struct node *bodyNode) {
-  nodeCreate(&(struct node){.type = NODE_TYPE_STATEMENT_WHILE,
-                            .stmt.whileStmt.expNode = expNode,
-                            .stmt.whileStmt.bodyNode = bodyNode});
-}
-void makeDoWhileNode(struct node *bodyNode, struct node *expNode) {
-  nodeCreate(&(struct node){.type = NODE_TYPE_STATEMENT_DO_WHILE,
-                            .stmt.whileStmt.expNode = expNode,
-                            .stmt.whileStmt.bodyNode = bodyNode});
-}
-void makeSwitchNode(struct node *expNode, struct node *bodyNode,
-                    struct vector *cases, bool hasDefaultCase) {
-  nodeCreate(&(struct node){.type = NODE_TYPE_STATEMENT_SWITCH,
-                            .stmt.switchStmt.exp = expNode,
-                            .stmt.switchStmt.body = bodyNode,
-                            .stmt.switchStmt.cases = cases,
-                            .stmt.switchStmt.hasDefaultCase = hasDefaultCase});
-}
-void makeContinueNode() {
-  nodeCreate(&(struct node){.type = NODE_TYPE_STATEMENT_CONTINUE});
-}
-void makeBreakNode() {
-  nodeCreate(&(struct node){.type = NODE_TYPE_STATEMENT_BREAK});
-}
-void makeLabelNode(struct node *labelNode) {
-  nodeCreate(
-      &(struct node){.type = NODE_TYPE_LABEL, .nodeLabel.name = labelNode});
-}
-void makeGotoNode(struct node *labelNode) {
-  nodeCreate(&(struct node){.type = NODE_TYPE_STATEMENT_GOTO,
-                            .stmt.gotoStmt.labelNode = labelNode});
-}
-void makeCaseNode(struct node *labelNode) {
-  nodeCreate(&(struct node){.type = NODE_TYPE_STATEMENT_CASE,
-                            .stmt._case.exp = labelNode});
-}
-void makeTenaryNode(struct node *trueNode, struct node *falseNode) {
-  nodeCreate(&(struct node){.type = NODE_TYPE_TENARY,
-                            .tenary.trueNode = trueNode,
-                            .tenary.falseNode = falseNode});
-}
-void makeCastNode(struct datatype *dtype, struct node *opperandNode) {
-  nodeCreate(&(struct node){.type = NODE_TYPE_CAST,
-                            .cast.dtype = *dtype,
-                            .cast.operand = opperandNode});
-}
-bool nodeIsExpression(struct node *node, const char *op) {
+bool node_is_expression(struct node *node, const char *op) {
   return node->type == NODE_TYPE_EXPRESSION && S_EQ(node->exp.op, op);
 }
-bool isArrayNode(struct node *node) { return nodeIsExpression(node, "[]"); }
-bool isNodeAssignment(struct node *node) {
-  if (node->type != NODE_TYPE_EXPRESSION) {
+
+bool is_node_assignment(struct node *node) {
+  if (node->type != NODE_TYPE_EXPRESSION)
     return false;
-  }
 
   return S_EQ(node->exp.op, "=") || S_EQ(node->exp.op, "+=") ||
          S_EQ(node->exp.op, "-=") || S_EQ(node->exp.op, "/=") ||
          S_EQ(node->exp.op, "*=");
 }
-bool nodeIsStructOrUnion(struct node *node) {
-  return node->type == NODE_TYPE_STRUCT || node->type == NODE_TYPE_UNION;
-}
 
-bool nodeValid(struct node *node) {
+bool node_valid(struct node *node) {
   return node && node->type != NODE_TYPE_BLANK;
-}
-void makeUnaryNode(const char *op, struct node *operandNode) {
-  nodeCreate(&(struct node){
-      .type = NODE_TYPE_UNARY, .unary.op = op, .unary.operand = operandNode});
-}
-bool functionNodeIsPrototype(struct node *node) {
-  return node->func.bodyN == NULL;
-}
-
-size_t functionNodeStackSize(struct node *node, compileProcess *cp) {
-  if (node->type != NODE_TYPE_FUNCTION) {
-    compilerError(cp, "Not a function node \n");
-  }
-  return node->func.stackSize;
 }

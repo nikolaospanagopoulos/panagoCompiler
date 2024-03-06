@@ -1,102 +1,134 @@
-#include "compileProcess.h"
 #include "compiler.h"
-#include "node.h"
-#include "string.h"
 #include "vector.h"
-#include <stdlib.h>
-
-static void symResolverPushSymbol(compileProcess *process, struct symbol *sym) {
-  // CLEANUP
+static void symresolver_push_symbol(struct compile_process *process,
+                                    struct symbol *sym) {
   vector_push(process->symbols.table, &sym);
 }
 
-void symResolverInitialize(struct compileProcess *process) {
+void symresolver_initialize(struct compile_process *process) {
   process->symbols.tables = vector_create(sizeof(struct vector *));
   vector_push(process->gbForVectors, &process->symbols.tables);
 }
 
-void symresolverNewTable(compileProcess *process) {
+void symresolver_new_table(struct compile_process *process) {
+  // Save the current table
   vector_push(process->symbols.tables, &process->symbols.table);
+
+  // Overwrite the active table
   process->symbols.table = vector_create(sizeof(struct symbol *));
   vector_push(process->gbForVectors, &process->symbols.table);
 }
-void symresolverEndTable(compileProcess *process) {
-  struct vector *lastTable = vector_back_ptr(process->symbols.tables);
-  process->symbols.table = lastTable;
+
+void symresolver_end_table(struct compile_process *process) {
+  struct vector *last_table = vector_back_ptr(process->symbols.tables);
+  process->symbols.table = last_table;
   vector_pop(process->symbols.tables);
 }
 
-symbol *symresolverGetSymbol(compileProcess *process, const char *name) {
+struct symbol *symresolver_get_symbol(struct compile_process *process,
+                                      const char *name) {
   vector_set_peek_pointer(process->symbols.table, 0);
-  symbol *sym = vector_peek_ptr(process->symbols.table);
-  while (sym) {
-    if (S_EQ(sym->name, name)) {
+  struct symbol *symbol = vector_peek_ptr(process->symbols.table);
+  while (symbol) {
+    if (S_EQ(symbol->name, name)) {
       break;
     }
-    sym = vector_peek_ptr(process->symbols.table);
+
+    symbol = vector_peek_ptr(process->symbols.table);
   }
 
-  return sym;
+  return symbol;
 }
-symbol *symresolverGetSymbolForNativeFunction(compileProcess *process,
-                                              const char *name) {
-  symbol *sym = symresolverGetSymbol(process, name);
+
+struct symbol *
+symresolver_get_symbol_for_native_function(struct compile_process *process,
+                                           const char *name) {
+  struct symbol *sym = symresolver_get_symbol(process, name);
   if (!sym) {
     return NULL;
   }
+
   if (sym->type != SYMBOL_TYPE_NATIVE_FUNCTION) {
     return NULL;
   }
+
   return sym;
 }
-symbol *symresolverRegisterSymbol(compileProcess *process, const char *symName,
-                                  int type, void *data) {
-  if (symresolverGetSymbol(process, symName)) {
+
+struct symbol *symresolver_register_symbol(struct compile_process *process,
+                                           const char *sym_name, int type,
+                                           void *data) {
+  if (symresolver_get_symbol(process, sym_name)) {
     return NULL;
   }
-  symbol *sym = calloc(1, sizeof(struct symbol));
-  vector_push(process->gb, &sym);
-  sym->name = symName;
+
+  struct symbol *sym = calloc(1, sizeof(struct symbol));
+  sym->name = sym_name;
   sym->type = type;
   sym->data = data;
-  symResolverPushSymbol(process, sym);
+  symresolver_push_symbol(process, sym);
   return sym;
 }
-node *symresolverNode(symbol *sym) {
+
+struct node *symresolver_node(struct symbol *sym) {
   if (sym->type != SYMBOL_TYPE_NODE) {
     return NULL;
   }
+
   return sym->data;
 }
-void symresolverBuildForVariableNode(compileProcess *process, node *node) {}
-void symresolverBuildForFunctionNode(compileProcess *process, node *node) {}
-void symresolverBuildForStructureNode(compileProcess *process, node *node) {
-  if (node->flags & NODE_FLAG_IS_FORWARD_DECLERATION) {
-    return;
-  }
-  symresolverRegisterSymbol(process, node->_struct.name, SYMBOL_TYPE_NODE,
-                            node);
-}
-void symresolverBuildForUnionNode(compileProcess *process, node *node) {
 
-  if (node->flags & NODE_FLAG_IS_FORWARD_DECLERATION) {
+void symresolver_build_for_variable_node(struct compile_process *process,
+                                         struct node *node) {
+  compiler_error(process, "Variables not yet supported\n");
+}
+
+void symresolver_build_for_function_node(struct compile_process *process,
+                                         struct node *node) {
+  compiler_error(process, "Functions are not yet supported\n");
+}
+
+void symresolver_build_for_structure_node(struct compile_process *process,
+                                          struct node *node) {
+  if (node->flags & NODE_FLAG_IS_FORWARD_DECLARATION) {
+    // We do not register forward declarations.
     return;
   }
-  symresolverRegisterSymbol(process, node->_union.name, SYMBOL_TYPE_NODE, node);
+
+  symresolver_register_symbol(process, node->_struct.name, SYMBOL_TYPE_NODE,
+                              node);
 }
-void symresolverBuildForNode(compileProcess *process, node *node) {
+
+void symresolver_build_for_union_node(struct compile_process *process,
+                                      struct node *node) {
+  if (node->flags & NODE_FLAG_IS_FORWARD_DECLARATION) {
+    // We do not register forward declarations.
+    return;
+  }
+
+  symresolver_register_symbol(process, node->_union.name, SYMBOL_TYPE_NODE,
+                              node);
+}
+
+void symresolver_build_for_node(struct compile_process *process,
+                                struct node *node) {
   switch (node->type) {
   case NODE_TYPE_VARIABLE:
-    symresolverBuildForVariableNode(process, node);
+    symresolver_build_for_variable_node(process, node);
     break;
+
   case NODE_TYPE_FUNCTION:
-    symresolverBuildForFunctionNode(process, node);
+    symresolver_build_for_function_node(process, node);
     break;
+
   case NODE_TYPE_STRUCT:
-    symresolverBuildForStructureNode(process, node);
+    symresolver_build_for_structure_node(process, node);
     break;
+
   case NODE_TYPE_UNION:
-    symresolverBuildForUnionNode(process, node);
+    symresolver_build_for_union_node(process, node);
     break;
+
+    // Ignore all other node types, because they cant become symbols.
   }
 }

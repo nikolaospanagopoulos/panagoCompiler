@@ -1,8 +1,6 @@
 #pragma once
-typedef struct pos {
-
+struct pos {
   int line;
   int col;
   const char *filename;
-
-} pos;
+};

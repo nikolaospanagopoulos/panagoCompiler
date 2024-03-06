@@ -1,5 +1,4 @@
 #include "vector.h"
-#include "node.h"
 #include "token.h"
 #include <assert.h>
 #include <memory.h>
@@ -7,9 +6,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-static compileProcess *process;
-static lexProcess *pr;
-void setCompileProcessLexProcess(compileProcess *cp, lexProcess *lex) {
+static struct compile_process *process;
+static struct lex_process *pr;
+void setCompileProcessLexProcess(struct compile_process *cp,
+                                 struct lex_process *lex) {
   process = cp;
   pr = lex;
 }
@@ -49,7 +49,6 @@ struct vector *vector_clone(struct vector *vector) {
   new_vec->data = new_data_address;
 
   // Saves are not cloned with vector_clone yet.
-  // assert(vector->saves == NULL);
   return new_vec;
 }
 
@@ -206,12 +205,12 @@ void vector_pop_last_peek(struct vector *vector) {
 void vector_push(struct vector *vector, void *elem) {
   void *ptr = vector_at(vector, vector->rindex);
   memcpy(ptr, elem, vector->esize);
-  if (vector->esize == sizeof(token)) {
+  if (vector->esize == sizeof(struct token)) {
 
     struct token *tmp = (struct token *)elem;
-    if (tmp->type == STRING || tmp->type == OPERATOR ||
-        tmp->type == IDENTIFIER || tmp->type == KEYWORD ||
-        tmp->type == COMMENT) {
+    if (tmp->type == TOKEN_TYPE_STRING || tmp->type == TOKEN_TYPE_OPERATOR ||
+        tmp->type == TOKEN_TYPE_IDENTIFIER || tmp->type == TOKEN_TYPE_KEYWORD ||
+        tmp->type == TOKEN_TYPE_COMMENT) {
       struct token *tok = (struct token *)ptr;
       tok->sval = tmp->sval;
     }

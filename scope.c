@@ -1,12 +1,14 @@
-#include "compileProcess.h"
 #include "compiler.h"
 #include "vector.h"
+#include <assert.h>
 #include <memory.h>
-#include <stddef.h>
 #include <stdlib.h>
-
-scope *scopeAlloc(compileProcess *cp) {
-  scope *scope = calloc(1, sizeof(struct scope));
+static struct compile_process *cp;
+void set_compile_process_for_scope(struct compile_process *process) {
+  cp = process;
+}
+struct scope *scope_alloc(struct compile_process *cp) {
+  struct scope *scope = calloc(1, sizeof(struct scope));
   scope->entities = vector_create(sizeof(void *));
   vector_push(cp->gb, &scope);
   vector_push(cp->gbForVectors, &scope->entities);
@@ -15,84 +17,111 @@ scope *scopeAlloc(compileProcess *cp) {
   return scope;
 }
 
-scope *createRootScope(compileProcess *cp) {
-  if (cp->scope.root || cp->scope.current) {
-    return NULL;
+void scope_dealloc(struct scope *scope) {
+  // Do nothing for now.
+}
+
+struct scope *scope_create_root(struct compile_process *process) {
+  if (process->scope.root) {
+    compiler_error(cp, "scope error: root scope already exists \n");
   }
-  scope *rootScope = scopeAlloc(cp);
-  cp->scope.root = rootScope;
-  cp->scope.current = rootScope;
-  return rootScope;
-}
-void scopeDealloc(scope *scope) {
-  if (scope) {
+  if (process->scope.current) {
+    compiler_error(cp, "scope error: current scope already exists \n");
   }
+
+  struct scope *root_scope = scope_alloc(process);
+  process->scope.root = root_scope;
+  process->scope.current = root_scope;
+  return root_scope;
 }
-void scopeFreeRoot(compileProcess *cp) {
-  cp->scope.root = NULL;
-  cp->scope.current = NULL;
+
+void scope_free_root(struct compile_process *process) {
+  scope_dealloc(process->scope.root);
+  process->scope.root = NULL;
+  process->scope.current = NULL;
 }
-scope *scopeNew(compileProcess *process, int flags) {
-  if (!process->scope.root || !process->scope.current) {
-    return NULL;
+
+struct scope *scope_new(struct compile_process *process, int flags) {
+  if (!process->scope.root) {
+    compiler_error(cp, "scope error: root scope doesnt exist \n");
   }
-  scope *newScope = scopeAlloc(process);
-  newScope->flags = flags;
-  newScope->parent = process->scope.current;
-  process->scope.current = newScope;
-  return newScope;
+  if (!process->scope.current) {
+    compiler_error(cp, "scope error: current scope doesnt exist \n");
+  }
+
+  struct scope *new_scope = scope_alloc(process);
+  new_scope->flags = flags;
+  new_scope->parent = process->scope.current;
+  process->scope.current = new_scope;
+  return new_scope;
 }
-void scopeIterationStarts(scope *scope) {
+
+void scope_iteration_start(struct scope *scope) {
   vector_set_peek_pointer(scope->entities, 0);
   if (scope->entities->flags & VECTOR_FLAG_PEEK_DECREMENT) {
     vector_set_peek_pointer_end(scope->entities);
   }
 }
-void *scopeIteratorBack(scope *scope) {
-  if (vector_count(scope->entities) == 0) {
+
+void scope_iteration_end(struct scope *scope) {}
+
+void *scope_iterate_back(struct scope *scope) {
+  if (vector_count(scope->entities) == 0)
     return NULL;
-  }
+
   return vector_peek_ptr(scope->entities);
 }
-void *scopeLastEntityAtScope(scope *scope) {
-  if (vector_count(scope->entities) == 0) {
+
+void *scope_last_entity_at_scope(struct scope *scope) {
+  if (vector_count(scope->entities) == 0)
     return NULL;
-  }
+
   return vector_back_ptr(scope->entities);
 }
-void *scopeLastEntityFromScopeStopAt(struct scope *scope,
-                                     struct scope *stopScope) {
-  if (scope == stopScope) {
+
+void *scope_last_entity_from_scope_stop_at(struct scope *scope,
+                                           struct scope *stop_scope) {
+  if (scope == stop_scope) {
     return NULL;
   }
-  void *last = scopeLastEntityAtScope(scope);
+
+  void *last = scope_last_entity_at_scope(scope);
   if (last) {
     return last;
   }
+
   struct scope *parent = scope->parent;
   if (parent) {
-    return scopeLastEntityFromScopeStopAt(parent, stopScope);
+    return scope_last_entity_from_scope_stop_at(parent, stop_scope);
   }
+
   return NULL;
 }
-void *scopeLastEntityStopAt(compileProcess *cp, scope *stopScope) {
-  return scopeLastEntityFromScopeStopAt(cp->scope.current, stopScope);
-}
-void *scopeLastEntity(compileProcess *cp) {
-  return scopeLastEntityStopAt(cp, NULL);
-}
-void scopePush(compileProcess *cp, void *ptr, size_t elemSize) {
-  vector_push(cp->scope.current->entities, &ptr);
-  cp->scope.current->size += elemSize;
+
+void *scope_last_entity_stop_at(struct compile_process *process,
+                                struct scope *stop_scope) {
+  return scope_last_entity_from_scope_stop_at(process->scope.current,
+                                              stop_scope);
 }
 
-void scopeFinish(compileProcess *cp) {
-  scope *newCurrentScope = cp->scope.current->parent;
-  scopeDealloc(cp->scope.current);
-  cp->scope.current = newCurrentScope;
-  // Maybe free vector;
-  if (cp->scope.root && !cp->scope.current) {
-    cp->scope.root = NULL;
+void *scope_last_entity(struct compile_process *process) {
+  return scope_last_entity_stop_at(process, NULL);
+}
+
+void scope_push(struct compile_process *process, void *ptr, size_t elem_size) {
+  vector_push(process->scope.current->entities, &ptr);
+  process->scope.current->size += elem_size;
+}
+
+void scope_finish(struct compile_process *process) {
+  struct scope *new_current_scope = process->scope.current->parent;
+  scope_dealloc(process->scope.current);
+  process->scope.current = new_current_scope;
+  if (process->scope.root && !process->scope.current) {
+    process->scope.root = NULL;
   }
 }
-scope *getCurrent(compileProcess *cp) { return cp->scope.current; }
+
+struct scope *scope_current(struct compile_process *process) {
+  return process->scope.current;
+}

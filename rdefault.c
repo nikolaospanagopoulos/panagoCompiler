@@ -1,208 +1,222 @@
 #include "compiler.h"
-#include "node.h"
+#include <assert.h>
+#include <memory.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
-static struct compileProcess *cp;
-void setCompileProcessForResolverDefaultHandler(compileProcess *process) {
-  cp = process;
-}
-struct resolverDefaultEntityData *
-resolverDefaultEntityPrivate(struct resolverEntity *entity) {
-  return entity->privateData;
+static struct compile_process *cp;
+
+void set_compile_process_for_resolver_default_handler(
+    struct compile_process *compile_proc) {
+  cp = compile_proc;
 }
 
-struct resolverDefaultScopeData *
-resolverDefaultScopePrivate(struct resolverScope *scope) {
-  return scope->privateData;
+struct resolver_default_entity_data *
+resolver_default_entity_private(struct resolver_entity *entity) {
+  return entity->private;
 }
 
-char *resolverDefaultStackAsmAddress(int stackOffset, char *out) {
-  if (stackOffset < 0) {
-    sprintf(out, "ebp%i", stackOffset);
+struct resolver_default_scope_data *
+resolver_default_scope_private(struct resolver_scope *scope) {
+  return scope->private;
+}
+
+char *resolver_default_stack_asm_address(int stack_offset, char *out) {
+  if (stack_offset < 0) {
+    sprintf(out, "ebp%i", stack_offset);
     return out;
   }
-  sprintf(out, "ebp+%i", stackOffset);
+
+  sprintf(out, "ebp+%i", stack_offset);
   return out;
 }
 
-struct resolverDefaultEntityData *resolverDefaultNewEntityData() {
-  struct resolverDefaultEntityData *entityData =
-      calloc(sizeof(struct resolverDefaultEntityData), 1);
-  // TODO: cleanup
-  return entityData;
+struct resolver_default_entity_data *resolver_default_new_entity_data() {
+  struct resolver_default_entity_data *entity_data =
+      calloc(sizeof(struct resolver_default_entity_data), 1);
+  return entity_data;
 }
 
-void resolverDefaultGlobalAsmAddress(const char *name, int offset,
-                                     char *addressOut) {
+void resolver_default_global_asm_address(const char *name, int offset,
+                                         char *address_out) {
   if (offset == 0) {
-    sprintf(addressOut, "%s", name);
+    sprintf(address_out, "%s", name);
     return;
   }
-  sprintf(addressOut, "%s+%i", name, offset);
+
+  sprintf(address_out, "%s+%i", name, offset);
 }
 
-void resolverDefaultEntityDataSetAddress(
-    struct resolverDefaultEntityData *entityData, struct node *varNode,
+void resolver_default_entity_data_set_address(
+    struct resolver_default_entity_data *entity_data, struct node *var_node,
     int offset, int flags) {
-  if (!varNode) {
+  if (!var_node) {
     return;
   }
-  if (!variableNode(varNode)->var.name) {
+  if (!variable_node(var_node)->var.name) {
     return;
   }
-  entityData->offset = offset;
+
+  entity_data->offset = offset;
   if (flags & RESOLVER_DEFAULT_ENTITY_FLAG_IS_LOCAL_STACK) {
-    resolverDefaultStackAsmAddress(offset, entityData->address);
-    sprintf(entityData->baseAddress, "ebp");
+    resolver_default_stack_asm_address(offset, entity_data->address);
+    sprintf(entity_data->base_address, "ebp");
   } else {
-    resolverDefaultGlobalAsmAddress(variableNode(varNode)->var.name, offset,
-                                    entityData->address);
-    sprintf(entityData->baseAddress, "%s", variableNode(varNode)->var.name);
+    resolver_default_global_asm_address(variable_node(var_node)->var.name,
+                                        offset, entity_data->address);
+    sprintf(entity_data->base_address, "%s", variable_node(var_node)->var.name);
   }
 }
-void *resolverDefaultMakePrivate(struct resolverEntity *entity,
-                                 struct node *node, int offset,
-                                 struct resolverScope *scope) {
-  // TODO: cleanup
-  struct resolverDefaultEntityData *entityData = resolverDefaultNewEntityData();
-  int entityFlags = 0x00;
+
+void *resolver_default_make_private(struct resolver_entity *entity,
+                                    struct node *node, int offset,
+                                    struct resolver_scope *scope) {
+  struct resolver_default_entity_data *entity_data =
+      resolver_default_new_entity_data();
+  int entity_flags = 0x00;
   if (entity->flags & RESOLVER_ENTITY_FLAG_IS_STACK) {
-    entityFlags |= RESOLVER_DEFAULT_ENTITY_FLAG_IS_LOCAL_STACK;
+    entity_flags |= RESOLVER_DEFAULT_ENTITY_FLAG_IS_LOCAL_STACK;
   }
-  entityData->offset = offset;
-  entityData->flags = entityFlags;
-  entityData->type = entity->type;
-  if (variableNode(node)) {
-    resolverDefaultEntityDataSetAddress(entityData, variableNode(node), offset,
-                                        entityFlags);
+  entity_data->offset = offset;
+  entity_data->flags = entity_flags;
+  entity_data->type = entity->type;
+  if (variable_node(node)) {
+    resolver_default_entity_data_set_address(entity_data, variable_node(node),
+                                             offset, entity_flags);
   }
-  return entityData;
+
+  return entity_data;
 }
-void resolverDefaultSetResultBase(struct resolverResult *result,
-                                  struct resolverEntity *baseEntity) {
-  struct resolverDefaultEntityData *entityData =
-      resolverDefaultEntityPrivate(baseEntity);
-  if (!entityData) {
+
+void resolver_default_set_result_base(struct resolver_result *result,
+                                      struct resolver_entity *base_entity) {
+  struct resolver_default_entity_data *data =
+      resolver_default_entity_private(base_entity);
+  if (!data) {
     return;
   }
-  strncpy(result->base.baseAddress, entityData->baseAddress,
-          sizeof(result->base.baseAddress));
-  strncpy(result->base.address, entityData->address,
-          sizeof(result->base.address));
-  result->base.offset = entityData->offset;
+
+  strncpy(result->base.base_address, data->base_address,
+          sizeof(result->base.base_address));
+  strncpy(result->base.address, data->address, sizeof(result->base.address));
+  result->base.offset = data->offset;
 }
-struct resolverDefaultEntityData *
-resolverDefaultNewEntityDataForVarNode(struct node *varNode, int offset,
-                                       int flags) {
-  struct resolverDefaultEntityData *entityData = resolverDefaultNewEntityData();
-  if (!variableNode(varNode)) {
-    compilerError(cp, "Var node is not set \n");
+
+struct resolver_default_entity_data *
+resolver_default_new_entity_data_for_var_node(struct node *var_node, int offset,
+                                              int flags) {
+  struct resolver_default_entity_data *entity_data =
+      resolver_default_new_entity_data();
+  if (!variable_node(var_node)) {
+    compiler_error(cp, "resolver handler error: variable node not set \n");
   }
-  entityData->offset = offset;
-  entityData->flags = flags;
-  entityData->type = RESOLVER_DEFAULT_ENTITY_DATA_TYPE_VARIABLE;
-  resolverDefaultEntityDataSetAddress(entityData, variableNode(varNode), offset,
-                                      flags);
-  return entityData;
+  entity_data->offset = offset;
+  entity_data->flags = flags;
+  entity_data->type = RESOLVER_DEFAULT_ENTITY_DATA_TYPE_VARIABLE;
+  resolver_default_entity_data_set_address(entity_data, variable_node(var_node),
+                                           offset, flags);
+  return entity_data;
 }
-struct resolverDefaultEntityData *
-resolverDefaultNewEntityDataForArrayBracket(struct node *bracketNode) {
-  struct resolverDefaultEntityData *entityData = resolverDefaultNewEntityData();
-  entityData->type = RESOLVER_DEFAULT_ENTITY_DATA_TYPE_ARRAY_BRACKET;
-  return entityData;
-}
-struct resolverDefaultEntityData *
-resolverDefaultNewEntityDataForFunction(struct node *funcNode, int flags) {
 
-  struct resolverDefaultEntityData *entityData = resolverDefaultNewEntityData();
-  entityData->flags = flags;
-  entityData->type = RESOLVER_DEFAULT_ENTITY_DATA_TYPE_FUNCTION;
-  resolverDefaultGlobalAsmAddress(funcNode->func.name, 0, entityData->address);
-  return entityData;
+struct resolver_default_entity_data *
+resolver_default_new_entity_data_for_array_bracket(struct node *breacket_node) {
+  struct resolver_default_entity_data *entity_data =
+      resolver_default_new_entity_data();
+  entity_data->type = RESOLVER_DEFAULT_ENTITY_DATA_TYPE_ARRAY_BRACKET;
+  return entity_data;
 }
-struct resolverEntity *
-resolverDefaultNewScopeEntity(struct resolverProcess *resolver,
-                              struct node *varNode, int offset, int flags) {
-  if (varNode->type != NODE_TYPE_VARIABLE) {
-    compilerError(cp, "Not a variable node \n");
+
+struct resolver_default_entity_data *
+resolver_default_new_entity_data_for_function(struct node *func_node,
+                                              int flags) {
+  struct resolver_default_entity_data *entity_data =
+      resolver_default_new_entity_data();
+  entity_data->flags = flags;
+  entity_data->type = RESOLVER_DEFAULT_ENTITY_DATA_TYPE_FUNCTION;
+  resolver_default_global_asm_address(func_node->func.name, 0,
+                                      entity_data->address);
+  return entity_data;
+}
+
+struct resolver_entity *
+resolver_default_new_scope_entity(struct resolver_process *resolver,
+                                  struct node *var_node, int offset,
+                                  int flags) {
+  if (var_node->type != NODE_TYPE_VARIABLE) {
+    compiler_error(cp, "resolver handler error: not a variable node \n");
   }
-  struct resolverDefaultEntityData *entityData =
-      resolverDefaultNewEntityDataForVarNode(variableNode(varNode), offset,
-                                             flags);
-  // TODO: cleanup
-  return resolverNewEntityForVarNode(resolver, variableNode(varNode),
-                                     entityData, offset);
-}
-struct resolverEntity *
-resolverDefaultRegisterFunction(struct resolverProcess *resolver,
-                                struct node *funcNode, int flags) {
-  struct resolverDefaultEntityData *private =
-      resolverDefaultNewEntityDataForFunction(funcNode, flags);
-
-  return resolverRegisterFunction(resolver, funcNode, private);
+  struct resolver_default_entity_data *entity_data =
+      resolver_default_new_entity_data_for_var_node(variable_node(var_node),
+                                                    offset, flags);
+  return resolver_new_entity_for_var_node(resolver, variable_node(var_node),
+                                          entity_data, offset);
 }
 
-void resolverDefaultNewScope(struct resolverProcess *resolver, int flags) {
-  struct resolverDefaultScopeData *scopeData =
-      calloc(sizeof(struct resolverDefaultScopeData), 1);
+struct resolver_entity *
+resolver_default_register_function(struct resolver_process *resolver,
+                                   struct node *func_node, int flags) {
+  struct resolver_default_entity_data *private =
+      resolver_default_new_entity_data_for_function(func_node, flags);
+  return resolver_register_function(resolver, func_node, private);
+}
 
-  scopeData->flags |= flags;
+void resolver_default_new_scope(struct resolver_process *resolver, int flags) {
+  struct resolver_default_scope_data *scope_data =
+      calloc(sizeof(struct resolver_default_scope_data), 1);
+  scope_data->flags |= flags;
+  resolver_new_scope(resolver, scope_data, flags);
+}
 
-  resolverNewScope(resolver, scopeData, flags);
+void resolver_default_finish_scope(struct resolver_process *resolver) {
+  resolver_finish_scope(resolver);
 }
-void resolverDefaultFinishScope(struct resolverProcess *resolver) {
-  resolverFinishScope(resolver);
+
+void *resolver_default_new_array_entity(struct resolver_result *result,
+                                        struct node *array_entity_node) {
+  return resolver_default_new_entity_data_for_array_bracket(array_entity_node);
 }
-void *resolverDefaultNewArrayEntity(struct resolverResult *result,
-                                    struct node *arrayEntityNode) {
-  return resolverDefaultNewEntityDataForArrayBracket(arrayEntityNode);
+
+void resolver_default_delete_entity(struct resolver_entity *entity) {
+  free(entity->private);
 }
-void resolverDefaultDeleteEntity(struct resolverEntity *entity) {
-  free(entity->privateData);
-}
-void resolverDefaultDeleteScope(struct resolverScope *scope) {
-  if (scope && scope->privateData) {
-    free(scope->privateData);
+
+void resolver_default_delete_scope(struct resolver_scope *scope) {
+  if (scope && scope->private) {
+    free(scope->private);
   }
 }
 
-static void resolverDefaultMergeArrayCalculateOutOffset(
-    struct datatype *dtype, struct resolverEntity *entity, int *outOffset) {
-  if (entity->array.arrayIndexNode->type != NODE_TYPE_NUMBER) {
-    compilerError(cp, "Array index is not of type number \n");
+static void resolver_default_merge_array_calculate_out_offset(
+    struct datatype *dtype, struct resolver_entity *entity, int *out_offset) {
+  if (entity->array.array_index_node->type != NODE_TYPE_NUMBER) {
+    compiler_error(cp,
+                   "resolver handler error: array index is not a number \n");
   }
-  int indexVal = entity->array.arrayIndexNode->llnum;
-  *(outOffset) += arrayOffset(dtype, entity->array.index, indexVal);
+  int index_val = entity->array.array_index_node->llnum;
+  *(out_offset) += array_offset(dtype, entity->array.index, index_val);
 }
-struct resolverEntity *
-resolverDefaultMergeEntities(struct resolverProcess *process,
-                             struct resolverResult *result,
-                             struct resolverEntity *resolverLeftEntity,
-                             struct resolverEntity *resolverRightEntity) {
-  int newPos = resolverLeftEntity->offset + resolverRightEntity->offset;
-  // TODO: cleanup
-  return resolverMakeEntity(
-      process, result, &resolverRightEntity->dtype, resolverLeftEntity->node,
 
-      &(struct resolverEntity){.type = resolverRightEntity->type,
-                               .flags = resolverLeftEntity->flags,
-                               .offset = newPos,
-                               .array = resolverRightEntity->array},
-      resolverLeftEntity->scope
-
-  );
+struct resolver_entity *resolver_default_merge_entities(
+    struct resolver_process *process, struct resolver_result *result,
+    struct resolver_entity *left_entity, struct resolver_entity *right_entity) {
+  int new_pos = left_entity->offset + right_entity->offset;
+  return resolver_make_entity(
+      process, result, &right_entity->dtype, left_entity->node,
+      &(struct resolver_entity){.type = right_entity->type,
+                                .flags = left_entity->flags,
+                                .offset = new_pos,
+                                .array = right_entity->array},
+      left_entity->scope);
 }
-struct resolverProcess *
-resolverDefaultNewProcess(struct compileProcess *compileProcess) {
 
-  return resolverNewProcess(
-      compileProcess, &(struct resolverCallbacks){
-                          .new_array_entity = resolverDefaultNewArrayEntity,
-                          .delete_entity = resolverDefaultDeleteEntity,
-                          .delete_scope = resolverDefaultDeleteScope,
-                          .merge_entities = resolverDefaultMergeEntities,
-                          .make_private = resolverDefaultMakePrivate,
-                          .set_result_base = resolverDefaultSetResultBase});
+struct resolver_process *
+resolver_default_new_process(struct compile_process *compiler) {
+  return resolver_new_process(
+      compiler, &(struct resolver_callbacks){
+                    .new_array_entity = resolver_default_new_array_entity,
+                    .delete_entity = resolver_default_delete_entity,
+                    .delete_scope = resolver_default_delete_scope,
+                    .merge_entities = resolver_default_merge_entities,
+                    .make_private = resolver_default_make_private,
+                    .set_result_base = resolver_default_set_result_base});
 }
