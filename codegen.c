@@ -426,6 +426,15 @@ void codegen_generate_global_variable_for_primitive(struct node *node) {
              asm_keyword_for_size(variable_size(node), tmp_buf));
   }
 }
+void codegen_generate_global_variable_for_struct(struct node *node) {
+  if (node->var.val != NULL) {
+    compiler_error(current_process,
+                   "we dont support values for structures yet \n");
+  }
+  char tmp_buf[256];
+  asm_push("%s: %s 0", node->var.name,
+           asm_keyword_for_size(variable_size(node), tmp_buf));
+}
 void codegen_generate_global_variable(struct node *node) {
   asm_push("; %s %s", node->var.type.type_str, node->var.name);
   switch (node->var.type.type) {
@@ -436,7 +445,9 @@ void codegen_generate_global_variable(struct node *node) {
   case DATA_TYPE_LONG:
     codegen_generate_global_variable_for_primitive(node);
     break;
-
+  case DATA_TYPE_STRUCT:
+    codegen_generate_global_variable_for_struct(node);
+    break;
   case DATA_TYPE_DOUBLE:
   case DATA_TYPE_FLOAT:
     compiler_error(current_process,
@@ -809,6 +820,8 @@ void codegen_generate_assignment_expression(struct node *node,
   codegen_generate_assignment_part(node->exp.left, node->exp.op, history);
 }
 
+void codegen_generate_structure_push(struct resolver_entity *entity,
+                                     struct history *history, int startPos);
 void codegen_generate_entity_access_for_function_call(
     struct resolver_result *result, struct resolver_entity *entity) {
   vector_set_flag(entity->func_call_data.arguments, VECTOR_FLAG_PEEK_DECREMENT);
@@ -821,7 +834,12 @@ void codegen_generate_entity_access_for_function_call(
                    "result_value");
   asm_push("mov ecx, ebx");
   if (datatype_is_struct_or_union_non_pointer(&entity->dtype)) {
-#warning "IMPLEMENT STRUCTURES IN FUNCTION CALL"
+    asm_push("; SUBTRACT ROOM FOR RETURNED STRUCTURE/UNION DATATYPE");
+    codegen_stack_sub_with_name(
+        align_value(datatype_size(&entity->dtype), DATA_SIZE_DWORD),
+        "result_value");
+    asm_push_ins_push("esp", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE,
+                      "result_value");
   }
 
   while (node) {
@@ -836,14 +854,24 @@ void codegen_generate_entity_access_for_function_call(
   }
   codegen_stack_add(stack_size);
   if (datatype_is_struct_or_union_non_pointer(&entity->dtype)) {
-#warning "generate a structure push"
+
+    asm_push("mov ebx, eax");
+    codegen_generate_structure_push(entity, history_begin(0), 0);
+
   } else {
     asm_push_ins_push_with_data(
         "eax", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE, "result_value", 0,
         &(struct stack_frame_data){.dtype = entity->dtype});
   }
 
-#warning "More structure stuff"
+  struct resolver_entity *next_entity = resolver_result_entity_next(entity);
+  if (next_entity && datatype_is_struct_or_union(&entity->dtype)) {
+    asm_push_ins_pop("eax", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE,
+                     "result_value");
+    asm_push("mov ebx, eax");
+    asm_push_ins_push("ebx", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE,
+                      "result_value");
+  }
 }
 void codegen_generate_entity_access_for_entity(struct resolver_result *result,
                                                struct resolver_entity *entity,

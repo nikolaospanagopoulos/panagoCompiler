@@ -79,7 +79,7 @@ void freeCustomEntitiesVector(struct vector *vecOfCustomEntities) {
     if (*data) {
       if ((*data)->func_call_data.arguments) {
         // freeVectorContents((*data)->func_call_data.arguments);
-        vector_free((*data)->func_call_data.arguments);
+        // vector_free((*data)->func_call_data.arguments);
       }
       if ((*data)->private) {
         free((*data)->private);
@@ -141,9 +141,8 @@ void free_compile_process(struct compile_process *cp) {
 
   freeVectorContentsVectors(cp->gbForVectors);
 
-  vector_free(cp->gbForVectors);
-
   resolverFree(cp);
+  vector_free(cp->gbForVectors);
   codegenFree(cp);
   if (cp->parser_fixup_sys) {
     fixup_sys_free(cp->parser_fixup_sys);

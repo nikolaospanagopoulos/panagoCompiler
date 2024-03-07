@@ -389,6 +389,7 @@ struct resolver_entity *resolver_create_new_entity_for_var_node_custom_scope(
     compiler_error(cp, "resolver error: scope doesnt exist \n");
   }
   entity->dtype = var_node->var.type;
+  entity->var_data.dtype = var_node->var.type;
   entity->node = var_node;
   entity->name = var_node->var.name;
   entity->offset = offset;
@@ -485,6 +486,7 @@ struct resolver_entity *resolver_create_new_entity_for_function_call(
 
   entity->dtype = left_operand_entity->dtype;
   entity->func_call_data.arguments = vector_create(sizeof(struct node *));
+  // vector_push(cp->gbForVectors, &entity->func_call_data.arguments);
   return entity;
 }
 

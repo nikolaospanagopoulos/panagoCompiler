@@ -1,7 +1,13 @@
-int test(int a) {}
+struct dog {
+  int a;
+  int b;
+  int bm;
+  int bmmmm;
+};
+
+struct dog a;
 
 int main() {
-  int b = 0;
-
-  test(50);
+  int e;
+  e = a.bmmmm;
 }
