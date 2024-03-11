@@ -6,8 +6,6 @@ struct dog {
 };
 
 struct dog a;
+struct dog b;
 
-int main() {
-  int e;
-  e = a.bmmmm;
-}
+int main() { a = b; }
