@@ -5,7 +5,8 @@ struct dog {
   int bmmmm;
 };
 
-struct dog a;
-struct dog b;
-
-int main() { a = b; }
+int main() {
+  int *p;
+  int b;
+  p = &b;
+}
