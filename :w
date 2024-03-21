@@ -106,8 +106,6 @@ static struct history *history_down(struct history *history, int flags) {
   return new_history;
 }
 
-void codegen_generate_entity_access_for_unary_get_address(
-    struct resolver_result *result, struct resolver_entity *entity);
 bool asm_datatype_back(struct datatype *dtype_out);
 void codegen_generate_structure_push(struct resolver_entity *entity,
                                      struct history *history, int startPos);
@@ -877,18 +875,6 @@ int codegen_entity_rules(struct resolver_entity *lastEntity,
   }
   if (lastEntity->type == RESOLVER_ENTITY_TYPE_FUNCTION_CALL) {
     ruleFlags |= CODEGEN_ENTITY_RULE_IS_FUNCTION_CALL;
-  } else if (history->flags & EXPRESSION_GET_ADDRESS) {
-    ruleFlags |= CODEGEN_ENTITY_RULE_IS_GET_ADDRESS;
-  } else if (lastEntity->type == RESOLVER_ENTITY_TYPE_UNARY_GET_ADDRESS) {
-    ruleFlags |= CODEGEN_ENTITY_RULE_IS_GET_ADDRESS;
-  } else {
-    ruleFlags |= CODEGEN_ENTITY_RULE_WILL_PEEK_AT_EBX;
-  }
-  return ruleFlags;
-}
-void codegen_apply_unary_access(int depth) {
-  for (int i = 0; i < depth; i++) {
-    asm_push("mov ebx, [ebx]");
   }
 }
 void codegen_generate_entity_access_for_unary_indirection_for_assignment_left_operand(
@@ -927,7 +913,7 @@ void codegen_generate_entity_access_for_entity_for_assignment_left_operand(
     break;
 
   case RESOLVER_ENTITY_TYPE_UNARY_GET_ADDRESS:
-    codegen_generate_entity_access_for_unary_get_address(result, entity);
+#warning "unary get address"
     break;
 
   case RESOLVER_ENTITY_TYPE_UNSUPPORTED:
@@ -1070,31 +1056,6 @@ void codegen_generate_entity_access_for_function_call(
                       "result_value");
   }
 }
-void codegen_generate_entity_access_for_unary_indirection(
-    struct resolver_result *result, struct resolver_entity *entity,
-    struct history *history) {
-  asm_push("; INDIRECTION PIDARAS");
-  struct datatype operandDtype;
-  assert(asm_datatype_back(&operandDtype));
-  int flags = asm_push_ins_pop("ebx", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE,
-                               "result_value");
-  int gen_entity_rules = codegen_entity_rules(result->last_entity, history);
-  int depth = entity->indirection.depth;
-  codegen_apply_unary_access(depth);
-  asm_push_ins_push_with_data(
-      "ebx", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE, "result_value",
-      STACK_FRAME_ELEMENT_FLAG_IS_PUSHED_ADDRESS,
-      &(struct stack_frame_data){.dtype = operandDtype});
-}
-void codegen_generate_entity_access_for_unary_get_address(
-    struct resolver_result *result, struct resolver_entity *entity) {
-  asm_push_ins_pop("ebx", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE,
-                   "result_value");
-  asm_push("; PUSH ADDRESS &");
-  asm_push_ins_push_with_data(
-      "ebx", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE, "result_value", 0,
-      &(struct stack_frame_data){.dtype = entity->dtype});
-}
 void codegen_generate_entity_access_for_entity(struct resolver_result *result,
                                                struct resolver_entity *entity,
                                                struct history *history) {
@@ -1113,12 +1074,11 @@ void codegen_generate_entity_access_for_entity(struct resolver_result *result,
     break;
 
   case RESOLVER_ENTITY_TYPE_UNARY_INDIRECTION:
-    codegen_generate_entity_access_for_unary_indirection(result, entity,
-                                                         history);
+#warning "unary indirection"
     break;
 
   case RESOLVER_ENTITY_TYPE_UNARY_GET_ADDRESS:
-    codegen_generate_entity_access_for_unary_get_address(result, entity);
+#warning "unary get address"
     break;
 
   case RESOLVER_ENTITY_TYPE_UNSUPPORTED:
