@@ -121,6 +121,7 @@ bool codegen_resolve_node_for_value(struct node *node, struct history *history);
 void codegen_new_scope(int flags) {
   resolver_default_new_scope(current_process->resolver, flags);
 }
+int codegen_label_count();
 
 void codegen_finish_scope() {
   resolver_default_finish_scope(current_process->resolver);
@@ -414,7 +415,7 @@ static const char *asm_keyword_for_size(size_t size, char *tmp_buf) {
     break;
 
   default:
-    sprintf(tmp_buf, "times %lld db ", (unsigned long)size);
+    sprintf(tmp_buf, "times %lu db ", (unsigned long)size);
     return tmp_buf;
   }
 
@@ -904,6 +905,10 @@ void codegen_generate_entity_access_for_unary_indirection_for_assignment_left_op
                                "result_value",
                                STACK_FRAME_ELEMENT_FLAG_IS_PUSHED_ADDRESS);
 }
+void codegen_generate_entity_access_for_unsupported(
+    struct resolver_result *result, struct resolver_entity *entity) {
+  codegen_generate_expressionable(entity->node, history_begin(0));
+}
 void codegen_generate_entity_access_for_entity_for_assignment_left_operand(
     struct resolver_result *result, struct resolver_entity *entity,
     struct history *history) {
@@ -931,7 +936,7 @@ void codegen_generate_entity_access_for_entity_for_assignment_left_operand(
     break;
 
   case RESOLVER_ENTITY_TYPE_UNSUPPORTED:
-#warning "unsupported"
+    codegen_generate_entity_access_for_unsupported(result, entity);
     break;
 
   case RESOLVER_ENTITY_TYPE_CAST:
@@ -1122,7 +1127,7 @@ void codegen_generate_entity_access_for_entity(struct resolver_result *result,
     break;
 
   case RESOLVER_ENTITY_TYPE_UNSUPPORTED:
-#warning "unsupported"
+    codegen_generate_entity_access_for_unsupported(result, entity);
     break;
 
   case RESOLVER_ENTITY_TYPE_CAST:

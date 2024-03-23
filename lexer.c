@@ -455,7 +455,7 @@ struct token *token_make_special_number_binary() {
   nextc();
 
   unsigned long number = 0;
-  const char *number_str = read_number_str();
+  const char *number_str = buffer_ptr(read_number_str());
   lexer_validate_binary_string(number_str);
   number = strtol(number_str, 0, 2);
   return token_make_number_for_value(number);
