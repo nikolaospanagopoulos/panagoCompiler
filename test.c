@@ -1,7 +1,8 @@
 int main() {
   int x = 0;
-  do {
-    x += 1;
-  } while (x < 50);
+
+  for (x = 0; x < 50; x += 1) {
+  }
+
   return x;
 }
