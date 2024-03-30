@@ -1,5 +1,7 @@
 int main() {
-  if (5) {
-    int x = 20;
-  }
+  int x = 0;
+  do {
+    x += 1;
+  } while (x < 50);
+  return x;
 }
