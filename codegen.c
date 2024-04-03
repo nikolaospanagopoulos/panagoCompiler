@@ -1726,6 +1726,10 @@ void codegen_generate_for_statements(struct node *node) {
   codegen_end_entry_exit_point();
 }
 
+void codegen_generate_break_stmt(struct node *node) {
+  codegen_goto_exit_point(node);
+}
+
 void codegen_generate_statement(struct node *node, struct history *history) {
   switch (node->type) {
   case NODE_TYPE_EXPRESSION:
@@ -1756,6 +1760,9 @@ void codegen_generate_statement(struct node *node, struct history *history) {
   case NODE_TYPE_STATEMENT_FOR:
     codegen_generate_for_statements(node);
     break;
+  case NODE_TYPE_STATEMENT_BREAK:
+	codegen_generate_break_stmt(node);
+	break;
   }
 
   codegen_discard_unused_stack();
