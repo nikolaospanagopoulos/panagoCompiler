@@ -1695,11 +1695,17 @@ void codegen_generate_do_while_stmt(struct node *node) {
 
 void codegen_generate_for_statements(struct node *node) {
   struct for_stmt *forStmt = &node->stmt.for_stmt;
-  codegen_begin_entry_exit_point();
   int for_loop_start_id = codegen_label_count();
   int for_loop_end_id = codegen_label_count();
   if (forStmt->init_node) {
     codegen_generate_expressionable(forStmt->init_node, history_begin(0));
+    asm_push_ins_pop_or_ignore("eax", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE,
+                               "result_value");
+  }
+  asm_push("jmp .for_loop%i", for_loop_start_id);
+  codegen_begin_entry_exit_point();
+  if (forStmt->loop_node) {
+    codegen_generate_expressionable(forStmt->loop_node, history_begin(0));
     asm_push_ins_pop_or_ignore("eax", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE,
                                "result_value");
   }
@@ -1720,7 +1726,7 @@ void codegen_generate_for_statements(struct node *node) {
     asm_push_ins_pop_or_ignore("eax", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE,
                                "result_value");
     asm_push("jmp .for_loop%i", for_loop_start_id);
-    asm_push(".for_loop_end%i", for_loop_end_id);
+    asm_push(".for_loop_end%i:", for_loop_end_id);
   }
 
   codegen_end_entry_exit_point();
@@ -1728,6 +1734,10 @@ void codegen_generate_for_statements(struct node *node) {
 
 void codegen_generate_break_stmt(struct node *node) {
   codegen_goto_exit_point(node);
+}
+
+void codegen_generate_continue_stmt(struct node *node) {
+  codegen_goto_entry_point(node);
 }
 
 void codegen_generate_statement(struct node *node, struct history *history) {
@@ -1761,8 +1771,11 @@ void codegen_generate_statement(struct node *node, struct history *history) {
     codegen_generate_for_statements(node);
     break;
   case NODE_TYPE_STATEMENT_BREAK:
-	codegen_generate_break_stmt(node);
-	break;
+    codegen_generate_break_stmt(node);
+    break;
+  case NODE_TYPE_STATEMENT_CONTINUE:
+    codegen_generate_continue_stmt(node);
+    break;
   }
 
   codegen_discard_unused_stack();
