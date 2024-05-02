@@ -143,6 +143,14 @@ struct string_table_element {
 };
 
 struct code_generator {
+
+  struct generator_switch_stmt {
+    struct generator_switch_stmt_entity {
+      int id;
+    } current;
+    struct vector *switches;
+  } _switch;
+
   // A vector of struct string_table_element*
   struct vector *string_table;
 

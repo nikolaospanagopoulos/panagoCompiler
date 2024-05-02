@@ -114,6 +114,7 @@ void codegenFree(struct compile_process *process) {
   vector_free(process->generator->string_table);
   freeVectorContents(process->generator->responses);
   vector_free(process->generator->responses);
+  vector_free(process->generator->_switch.switches);
   free(process->generator);
 }
 
