@@ -1823,25 +1823,26 @@ void codegen_generate_switch_stmt_case(struct node *node) {
   asm_push("; CASE %i", case_stmt_exp->llnum);
   codegen_end_case_statement();
 }
+
+void codegen_generate_goto_statement(struct node *node) {
+  asm_push("jmp label_%s", node->stmt._goto.label->sval);
+}
+
 void codegen_generate_statement(struct node *node, struct history *history) {
 
   switch (node->type) {
   case NODE_TYPE_EXPRESSION:
     codegen_generate_exp_node(node, history_begin(history->flags));
     break;
-
   case NODE_TYPE_UNARY:
     codegen_generate_unary(node, history_begin(history->flags));
     break;
-
   case NODE_TYPE_VARIABLE:
     codegen_generate_scope_variable(node);
     break;
-
   case NODE_TYPE_STATEMENT_IF:
     codegen_generate_if_stmt(node);
     break;
-
   case NODE_TYPE_STATEMENT_RETURN:
     codegen_generate_statement_return(node);
     break;
@@ -1868,6 +1869,9 @@ void codegen_generate_statement(struct node *node, struct history *history) {
     break;
   case NODE_TYPE_STATEMENT_DEFAULT:
     codegen_generate_switch_default_stmt(node);
+    break;
+  case NODE_TYPE_STATEMENT_GOTO:
+    codegen_generate_goto_statement(node);
     break;
   }
 
