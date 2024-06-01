@@ -1762,6 +1762,48 @@ void codegen_generate_for_statements(struct node *node) {
 
   codegen_end_entry_exit_point();
 }
+void codegen_generate_switch_default_stmt(struct node *node) {
+  asm_push("; DEFAULT CASE");
+  struct code_generator *generator = current_process->generator;
+  struct generator_switch_stmt *switch_stmt_data = &generator->_switch;
+  asm_push(".switch_stmt_%i_case_default:", switch_stmt_data->current.id);
+}
+void codegen_goto_exit_point_maintain_stack(struct node *node) {
+  struct code_generator *gen = current_process->generator;
+  struct codegen_exit_point *exit_point = codegen_current_exit_point();
+  asm_push("jmp .exit_point_%i", exit_point->id);
+}
+void codegen_generate_switch_stmt_case_jmps(struct node *node) {
+  vector_set_peek_pointer(node->stmt.switch_stmt.cases, 0);
+  struct parsed_switch_case *switch_case =
+      vector_peek(node->stmt.switch_stmt.cases);
+  while (switch_case) {
+
+    asm_push("cmp eax, %i", switch_case->index);
+    asm_push("je .switch_stmt_%i_case_%i", codegen_switch_id(),
+             switch_case->index);
+    switch_case = vector_peek(node->stmt.switch_stmt.cases);
+  }
+  if (node->stmt.switch_stmt.has_default_case) {
+    asm_push("jmp .switch_stmt_%i_case_default", codegen_switch_id());
+    return;
+  }
+  codegen_goto_exit_point_maintain_stack(node);
+}
+void codegen_generate_switch_stmt(struct node *node) {
+  codegen_begin_entry_exit_point();
+  codegen_begin_switch_statement();
+
+  codegen_generate_expressionable(node->stmt.switch_stmt.exp, history_begin(0));
+  asm_push_ins_pop_or_ignore("eax", STACK_FRAME_ELEMENT_TYPE_PUSHED_VALUE,
+                             "result_value");
+  codegen_generate_switch_stmt_case_jmps(node);
+
+  codegen_generate_body(node->stmt.switch_stmt.body,
+                        history_begin(IS_ALONE_STATEMENT));
+  codegen_end_switch_statement();
+  codegen_end_entry_exit_point();
+}
 
 void codegen_generate_break_stmt(struct node *node) {
   codegen_goto_exit_point(node);
@@ -1771,7 +1813,18 @@ void codegen_generate_continue_stmt(struct node *node) {
   codegen_goto_entry_point(node);
 }
 
+void codegen_generate_switch_stmt_case(struct node *node) {
+  struct node *case_stmt_exp = node->stmt._case.exp;
+  if (case_stmt_exp->type != NODE_TYPE_NUMBER) {
+    compiler_error(current_process,
+                   "Switch statement cases can be only numbers for now");
+  }
+  codegen_begin_case_statement(case_stmt_exp->llnum);
+  asm_push("; CASE %i", case_stmt_exp->llnum);
+  codegen_end_case_statement();
+}
 void codegen_generate_statement(struct node *node, struct history *history) {
+
   switch (node->type) {
   case NODE_TYPE_EXPRESSION:
     codegen_generate_exp_node(node, history_begin(history->flags));
@@ -1806,6 +1859,15 @@ void codegen_generate_statement(struct node *node, struct history *history) {
     break;
   case NODE_TYPE_STATEMENT_CONTINUE:
     codegen_generate_continue_stmt(node);
+    break;
+  case NODE_TYPE_STATEMENT_SWITCH:
+    codegen_generate_switch_stmt(node);
+    break;
+  case NODE_TYPE_STATEMENT_CASE:
+    codegen_generate_switch_stmt_case(node);
+    break;
+  case NODE_TYPE_STATEMENT_DEFAULT:
+    codegen_generate_switch_default_stmt(node);
     break;
   }
 

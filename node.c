@@ -81,6 +81,10 @@ void make_goto_node(struct node *label_node) {
                              .stmt._goto.label = label_node});
 }
 
+void make_default_node() {
+  node_create(&(struct node){.type = NODE_TYPE_STATEMENT_DEFAULT});
+}
+
 void make_label_node(struct node *name_node) {
   node_create(&(struct node){.type = NODE_TYPE_LABEL, .label.name = name_node});
 }

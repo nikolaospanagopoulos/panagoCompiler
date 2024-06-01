@@ -1,7 +1,12 @@
 int main() {
-  int x = 0;
+  int x = 3;
+  switch (x) {
+  case 3:
+    x = 90;
+    break;
 
-  for (x = 1; x < 50; x += 1) {
+  case 1:
+    x = 20;
     break;
   }
 
