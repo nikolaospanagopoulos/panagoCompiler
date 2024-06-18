@@ -1012,5 +1012,6 @@ void set_compile_process_for_helpers(struct compile_process *compile_proc);
 void set_compile_process_for_node(struct compile_process *cp);
 void set_compile_process_for_scope(struct compile_process *process);
 void make_default_node();
+struct datatype datatype_for_string();
 
 #endif

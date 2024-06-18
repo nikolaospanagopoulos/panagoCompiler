@@ -1,5 +1,7 @@
+int printf(const char *s);
 int main() {
-  int x = 3;
+  const char *abc = "nikos";
+  printf(abc);
 
   goto abc;
 abc:
