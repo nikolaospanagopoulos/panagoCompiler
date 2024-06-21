@@ -777,7 +777,19 @@ void codegen_generate_unary(struct node *node, struct history *history) {
   codegen_generate_normal_unary(node, history);
 }
 
+int codegen_remove_uninheritable_flags(int flags) {
+  return flags & ~EXPRESSION_UNINHERITABLE_FLAGS;
+}
+
 void codegen_generate_string(struct node *node, struct history *history);
+
+void codegen_generate_exp_parentheses_node(struct node *node,
+                                           struct history *history) {
+  codegen_generate_expressionable(
+      node->parenthesis.exp,
+      history_down(history,
+                   codegen_remove_uninheritable_flags(history->flags)));
+}
 void codegen_generate_expressionable(struct node *node,
                                      struct history *history) {
   bool is_root = codegen_is_exp_root(history);
@@ -798,6 +810,9 @@ void codegen_generate_expressionable(struct node *node,
     break;
   case NODE_TYPE_EXPRESSION:
     codegen_generate_exp_node(node, history);
+    break;
+  case NODE_TYPE_EXPRESSION_PARENTHESES:
+    codegen_generate_exp_parentheses_node(node, history);
     break;
   case NODE_TYPE_UNARY:
     codegen_generate_unary(node, history);
@@ -1556,9 +1571,6 @@ void codegen_generate_exp_node_for_arithmetic(struct node *node,
                               &(struct stack_frame_data){.dtype = last_dtype});
 }
 
-int codegen_remove_uninheritable_flags(int flags) {
-  return flags & ~EXPRESSION_UNINHERITABLE_FLAGS;
-}
 void codegen_generate_exp_node(struct node *node, struct history *history) {
   if (is_node_assignment(node)) {
     codegen_generate_assignment_expression(node, history);
